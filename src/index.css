@@ -1,4 +1,24 @@
-@import "tailwindcss/preflight";
-@tailwind utilities;
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+@import "tailwindcss";
 
+@theme {
+  --font-sans: "Inter", system-ui, sans-serif;
+}
 
+body {
+  font-family: var(--font-sans);
+  background-color: #09090b; /* zinc-950 */
+  color: #e4e4e7; /* zinc-200 */
+}
+
+@property --border-angle {
+  syntax: "<angle>";
+  inherits: true;
+  initial-value: 0turn;
+}
+
+@keyframes border {
+  to {
+    --border-angle: 1turn;
+  }
+}
