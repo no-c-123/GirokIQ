@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from "react";
 import { Stage, Layer, Rect } from "react-konva";
 import type { KonvaEventObject } from "konva/lib/Node";
 import { Minus, Plus } from "lucide-react";
 import { nanoid } from "nanoid";
-import { recognizeShape } from "../lib/shapeRecognition";
+import { useShapeSnapping } from "../hooks/useShapeSnapping";
+import type { RecognizedShape } from "../lib/ShapeRecognizer";
 import { isStrokeInPolygon, isRectInPolygon } from "../lib/selection";
 import { ERASE_RADIUS, useCanvasStore } from "./useCanvasStore";
 import { useBlockStore } from "../blocks/useBlockStore";
@@ -74,6 +75,39 @@ export default function CanvasPage({
 
    // Use the new image paste hook
    useImagePaste(stageSize, view);
+
+    const onSnapShape = useCallback((shape: RecognizedShape) => {
+        const shapePoints = shape.points.flatMap(p => [p.x, p.y]);
+        
+        // Update temp stroke to show the snapped shape
+        setTempStroke((prev: any) => {
+            if (!prev) return null;
+            return {
+                ...prev,
+                points: shapePoints,
+                shapeType: shape.type
+            };
+        });
+    }, []);
+
+    const onCancelSnap = useCallback(() => {
+        // Revert to raw points if user continues drawing
+        const rawPoints = tempPointsRef.current;
+        setTempStroke((prev: any) => {
+            if (!prev) return null;
+            const { shapeType, ...rest } = prev;
+            return {
+                ...rest,
+                points: [...rawPoints]
+            };
+        });
+    }, []);
+
+    const snapHook = useShapeSnapping({
+        onSnap: onSnapShape,
+        onCancel: onCancelSnap,
+        enabled: useCanvasStore((s) => s.shapeRecognitionEnabled)
+    });
 
    const getSelectionBBox = () => {
     if (selectedIds.length === 0) return null;
@@ -426,13 +460,24 @@ export default function CanvasPage({
     }
     
     if (newPoints.length > 0) {
-        setTempStroke((prev: any) => {
-            if (!prev) return null;
-            return {
-                ...prev,
-                points: [...tempPointsRef.current]
-            };
-        });
+        // If we are snapping, we don't update tempStroke with raw points here
+        // The snapHook will handle cancellation if we move significantly
+        // But for immediate feedback, we might want to update?
+        // Actually, if isSnapping is true, we should cancel first.
+        // snapHook.handleMove calls onCancel which updates tempStroke.
+        // So we just update tempStroke normally here, and if snap happens later, it overwrites.
+        
+        snapHook.handleMove(tempPointsRef.current);
+
+        if (!snapHook.isSnapping) {
+            setTempStroke((prev: any) => {
+                if (!prev) return null;
+                return {
+                    ...prev,
+                    points: [...tempPointsRef.current]
+                };
+            });
+        }
     }
   };
 
@@ -497,25 +542,26 @@ export default function CanvasPage({
       tempPointsRef.current = [];
     } else if (tempStrokeRef.current) {
       const current = tempStrokeRef.current;
-      let finalPoints: number[] | undefined;
-      const duration = Date.now() - pointerDownTimeRef.current;
-      const SNAP_THRESHOLD = 600; // ms
+      
+      let finalPoints = [...tempPointsRef.current];
+      let finalShapeType: string | undefined;
+      let finalOriginalPoints: number[] | undefined;
 
-      if (
-        useCanvasStore.getState().shapeRecognitionEnabled &&
-        current.points.length > 10 &&
-        duration >= SNAP_THRESHOLD
-      ) {
-        const recognized = recognizeShape(current.points);
-        if (recognized) {
-          finalPoints = recognized.points;
-        }
+      const snapped = snapHook.getSnappedShape();
+      if (snapped) {
+          finalPoints = snapped.points.flatMap(p => [p.x, p.y]);
+          finalShapeType = snapped.type;
+          finalOriginalPoints = [...tempPointsRef.current];
       }
+      
+      snapHook.cancelSnap();
       
       // Save final stroke to store
       const finalStroke = {
           ...current,
-          points: finalPoints || [...tempPointsRef.current]
+          points: finalPoints,
+          shapeType: finalShapeType,
+          originalPoints: finalOriginalPoints,
       };
       
       // We manually add it to store instead of calling endStroke which relied on state

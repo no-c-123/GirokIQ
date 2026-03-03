@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
+import { syncService } from '../lib/sync';
 import type { Session, User } from '@supabase/supabase-js';
 
 interface AuthState {
@@ -20,10 +21,12 @@ export const useAuthStore = create<AuthState>((set) => ({
       // Get initial session
       const { data: { session } } = await supabase.auth.getSession();
       set({ session, user: session?.user ?? null, loading: false });
+      syncService.setUserId(session?.user?.id ?? null);
 
       // Listen for changes
       supabase.auth.onAuthStateChange((_event, session) => {
         set({ session, user: session?.user ?? null, loading: false });
+        syncService.setUserId(session?.user?.id ?? null);
       });
     } catch (error) {
       console.error('Auth initialization error:', error);
@@ -34,5 +37,6 @@ export const useAuthStore = create<AuthState>((set) => ({
   signOut: async () => {
     await supabase.auth.signOut();
     set({ session: null, user: null });
+    syncService.setUserId(null);
   },
 }));

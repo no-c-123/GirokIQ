@@ -21,7 +21,7 @@ interface TileKey {
 
 // Custom midpoint smoothing algorithm for standard SVG paths
 // This replaces perfect-freehand to ensure true constant width
-function getSmoothSvgPath(points: number[]) {
+export function getSmoothSvgPath(points: number[]) {
   if (points.length < 4) return "";
 
   let d = `M ${points[0]} ${points[1]}`;
@@ -45,6 +45,21 @@ function getSmoothSvgPath(points: number[]) {
   d += ` L ${lastX} ${lastY}`;
 
   return d;
+}
+
+export function getPathData(stroke: Stroke) {
+  if (stroke.shapeType) {
+      if (stroke.points.length < 2) return "";
+      let d = `M ${stroke.points[0]} ${stroke.points[1]}`;
+      for (let i = 2; i < stroke.points.length; i += 2) {
+          d += ` L ${stroke.points[i]} ${stroke.points[i+1]}`;
+      }
+      if (stroke.shapeType !== "line" && stroke.points.length > 4) {
+          d += " Z";
+      }
+      return d;
+  }
+  return getSmoothSvgPath(stroke.points);
 }
 
 export function DrawingLayer({
@@ -158,7 +173,7 @@ export function DrawingLayer({
     return (
         <Group x={selectionOffset.x} y={selectionOffset.y}>
             {selectedStrokes.map(stroke => {
-                const pathData = getSmoothSvgPath(stroke.points);
+                const pathData = getPathData(stroke);
                 return (
                   <Path
                     key={stroke.id}
@@ -182,7 +197,7 @@ export function DrawingLayer({
   // Current stroke path generation
   const currentStrokePath = useMemo(() => {
     if (!currentStroke) return null;
-    const pathData = getSmoothSvgPath(currentStroke.points);
+    const pathData = getPathData(currentStroke);
     
     // Check if it's a lasso stroke (based on ID or some property we set)
     const isLasso = currentStroke.id === "lasso-current";
@@ -230,7 +245,7 @@ const Tile = memo(function Tile({ x, y, strokes }: { x: number, y: number, strok
 
     const paths = useMemo(() => {
         return strokes.map(stroke => {
-            const pathData = getSmoothSvgPath(stroke.points);
+            const pathData = getPathData(stroke);
             return (
               <Path
                 key={stroke.id}

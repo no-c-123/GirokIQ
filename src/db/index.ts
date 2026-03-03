@@ -12,6 +12,8 @@ export interface StrokeRow {
   color: string;
   width: number;
   pressures?: number[];
+  shapeType?: string;
+  originalPoints?: number[];
 }
 
 export interface AppStateRow {
