@@ -56,6 +56,9 @@ export default function CanvasPage({
   const isPointerDownRef = useRef(false);
   const isErasingRef = useRef(false);
   const isGestureRef = useRef(false);
+  const isPanningRef = useRef(false);
+  const isSpacePressedRef = useRef(false);
+  const lastPanPositionRef = useRef<{ x: number; y: number } | null>(null);
   const lastGestureCenterRef = useRef<{ x: number; y: number } | null>(null);
   const lastGestureDistanceRef = useRef<number | null>(null);
   const [tempStroke, setTempStroke] = useState<any | null>(null);
@@ -245,6 +248,47 @@ export default function CanvasPage({
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (isEditableTarget(e.target)) return;
+
+      // Space key for panning mode
+      if (e.code === "Space" && !e.repeat) {
+        e.preventDefault();
+        isSpacePressedRef.current = true;
+        if (viewportRef.current) viewportRef.current.style.cursor = "grab";
+        return;
+      }
+
+      // Arrow keys for panning
+      const panStep = e.shiftKey ? 200 : 50;
+
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setView((prev) => ({
+          ...prev,
+          position: { ...prev.position, x: prev.position.x + panStep },
+        }));
+      }
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        setView((prev) => ({
+          ...prev,
+          position: { ...prev.position, x: prev.position.x - panStep },
+        }));
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setView((prev) => ({
+          ...prev,
+          position: { ...prev.position, y: prev.position.y + panStep },
+        }));
+      }
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setView((prev) => ({
+          ...prev,
+          position: { ...prev.position, y: prev.position.y - panStep },
+        }));
+      }
+
       if (!(e.metaKey || e.ctrlKey)) return;
 
       const key = e.key;
@@ -266,9 +310,31 @@ export default function CanvasPage({
       }
     };
 
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "Space") {
+        isSpacePressedRef.current = false;
+        isPanningRef.current = false;
+        
+        // Restore cursor
+        if (viewportRef.current) {
+          if (tool === "pen" || tool === "eraser" || tool === "lasso") {
+            viewportRef.current.style.cursor = "crosshair";
+          } else if (tool === "text") {
+            viewportRef.current.style.cursor = "text";
+          } else {
+            viewportRef.current.style.cursor = "default";
+          }
+        }
+      }
+    };
+
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [stageSize, baseScale]);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
+  }, [stageSize, baseScale, tool]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -339,6 +405,15 @@ export default function CanvasPage({
   const handlePointerDown = (e: KonvaEventObject<PointerEvent>) => {
     e.evt.preventDefault();
     if (isGestureRef.current) return;
+
+    // Check for space key or middle mouse button (button 1)
+    if (isSpacePressedRef.current || e.evt.button === 1) {
+      isPanningRef.current = true;
+      lastPanPositionRef.current = { x: e.evt.clientX, y: e.evt.clientY };
+      if (viewportRef.current) viewportRef.current.style.cursor = "grabbing";
+      return;
+    }
+
     isPointerDownRef.current = true;
     pointerDownTimeRef.current = Date.now();
     
@@ -409,6 +484,18 @@ export default function CanvasPage({
   const handlePointerMove = (e: KonvaEventObject<PointerEvent>) => {
     e.evt.preventDefault();
     if (isGestureRef.current) return;
+
+    if (isPanningRef.current && lastPanPositionRef.current) {
+      const dx = e.evt.clientX - lastPanPositionRef.current.x;
+      const dy = e.evt.clientY - lastPanPositionRef.current.y;
+      lastPanPositionRef.current = { x: e.evt.clientX, y: e.evt.clientY };
+      
+      setView((prev) => ({
+        ...prev,
+        position: { x: prev.position.x + dx, y: prev.position.y + dy },
+      }));
+      return;
+    }
 
     const containerPoint = getContainerPoint(e.evt);
     if (!containerPoint) return;
@@ -482,6 +569,22 @@ export default function CanvasPage({
   };
 
   const handlePointerUp = () => {
+    if (isPanningRef.current) {
+      isPanningRef.current = false;
+      if (viewportRef.current) {
+        viewportRef.current.style.cursor = isSpacePressedRef.current ? "grab" : "default";
+        // If we reverted to default, check tool
+        if (!isSpacePressedRef.current) {
+             if (tool === "pen" || tool === "eraser" || tool === "lasso") {
+                 viewportRef.current.style.cursor = "crosshair";
+             } else if (tool === "text") {
+                 viewportRef.current.style.cursor = "text";
+             }
+        }
+      }
+      return;
+    }
+
     if (tool === "lasso" && isPointerDownRef.current && tempStrokeRef.current) {
       const current = tempStrokeRef.current;
       // Use tempPointsRef for the most up-to-date points, as current.points might be stale
