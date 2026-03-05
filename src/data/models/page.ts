@@ -3,6 +3,7 @@ export interface Page {
   notebookId: string;
   title: string;
   type: "canvas" | "document";
+  starred?: boolean;
   createdAt: number;
   updatedAt: number;
   settings: {

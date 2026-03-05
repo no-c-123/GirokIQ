@@ -58,6 +58,8 @@ export function Editor({ page, notebook }: EditorProps) {
   const loadBlocksForPage = useBlockStore((s) => s.loadBlocksForPage);
   const selectedBlockId = useBlockStore((s) => s.selectedBlockId);
   const deleteBlock = useBlockStore((s) => s.deleteBlock);
+  const deletePage = useAppStore((s) => s.deletePage);
+  const toggleStar = useAppStore((s) => s.toggleStar);
   const historyPush = useHistoryStore((s) => s.push);
   const undo = useHistoryStore((s) => s.undo);
   const redo = useHistoryStore((s) => s.redo);
@@ -217,9 +219,25 @@ export function Editor({ page, notebook }: EditorProps) {
 
         <div className="flex items-center gap-1">
           <span className="text-xs text-zinc-600 mr-4">Last edited just now</span>
-          <ToolbarButton icon={Clock} tooltip="History" />
-          <ToolbarButton icon={Star} tooltip="Star" />
-          <ToolbarButton icon={Share} tooltip="Share" />
+          <ToolbarButton 
+            icon={Clock} 
+            tooltip="History" 
+            onClick={() => alert("History feature coming soon!")}
+          />
+          <ToolbarButton 
+            icon={Star} 
+            tooltip={page.starred ? "Unstar" : "Star"} 
+            active={page.starred}
+            onClick={() => toggleStar(page.id)}
+          />
+          <ToolbarButton 
+            icon={Share} 
+            tooltip="Share" 
+            onClick={() => {
+              navigator.clipboard.writeText(window.location.href);
+              alert("Link copied to clipboard!");
+            }}
+          />
           <div className="w-px h-4 bg-white/10 mx-2" />
           <ToolbarButton 
             icon={isFullscreen ? Minimize2 : Maximize2} 
@@ -244,14 +262,35 @@ export function Editor({ page, notebook }: EditorProps) {
                   style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}
                 >
                   <div className="p-1">
-                    <button className="flex items-center w-full px-3 py-2 text-sm text-zinc-400 hover:text-zinc-100 hover:bg-white/5 rounded transition-colors text-left">
+                    <button 
+                      onClick={() => {
+                        window.print();
+                        setShowMenu(false);
+                      }}
+                      className="flex items-center w-full px-3 py-2 text-sm text-zinc-400 hover:text-zinc-100 hover:bg-white/5 rounded transition-colors text-left"
+                    >
                       <span className="flex-1">Export PDF</span>
                     </button>
-                    <button className="flex items-center w-full px-3 py-2 text-sm text-zinc-400 hover:text-zinc-100 hover:bg-white/5 rounded transition-colors text-left">
+                    <button 
+                      onClick={() => {
+                        navigator.clipboard.writeText(window.location.href);
+                        setShowMenu(false);
+                        alert("Link copied to clipboard!");
+                      }}
+                      className="flex items-center w-full px-3 py-2 text-sm text-zinc-400 hover:text-zinc-100 hover:bg-white/5 rounded transition-colors text-left"
+                    >
                       <span className="flex-1">Copy Link</span>
                     </button>
                     <div className="h-px bg-white/5 my-1" />
-                    <button className="flex items-center w-full px-3 py-2 text-sm text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded transition-colors text-left">
+                    <button 
+                      onClick={() => {
+                        if (confirm("Are you sure you want to delete this page?")) {
+                          deletePage(page.id);
+                        }
+                        setShowMenu(false);
+                      }}
+                      className="flex items-center w-full px-3 py-2 text-sm text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded transition-colors text-left"
+                    >
                       <span className="flex-1">Delete Page</span>
                     </button>
                   </div>

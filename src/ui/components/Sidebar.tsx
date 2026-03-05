@@ -33,6 +33,8 @@ export function Sidebar() {
   const deletePage = useAppStore((s) => s.deletePage);
   const addFolder = useAppStore((s) => s.addFolder);
   const addNotebook = useAppStore((s) => s.addNotebook);
+  const deleteFolder = useAppStore((s) => s.deleteFolder);
+  const deleteNotebook = useAppStore((s) => s.deleteNotebook);
 
   const [namingModal, setNamingModal] = useState<{
     isOpen: boolean;
@@ -42,7 +44,21 @@ export function Sidebar() {
   const [showSettings, setShowSettings] = useState(false);
 
   const handleDeletePage = (id: string) => {
-    void deletePage(id);
+    if (confirm("Are you sure you want to delete this page?")) {
+        void deletePage(id);
+    }
+  };
+
+  const handleDeleteFolder = (id: string) => {
+    if (confirm("Are you sure you want to delete this folder? All notebooks and pages inside will be deleted.")) {
+        void deleteFolder(id);
+    }
+  };
+
+  const handleDeleteNotebook = (id: string) => {
+    if (confirm("Are you sure you want to delete this notebook? All pages inside will be deleted.")) {
+        void deleteNotebook(id);
+    }
   };
 
   const handleCreateNaming = (name: string) => {
@@ -91,122 +107,129 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="h-full w-70 flex flex-col bg-zinc-900/30 backdrop-blur-xl border-r border-white/5 text-zinc-400">
-      {/* Header */}
-      <div className="p-4 pt-6">
-        <div className="flex items-center gap-2 mb-6 px-2">
-          <div className="w-6 h-6 rounded-md bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.3)]">
-            <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
+    <>
+      <aside className="h-full w-70 flex flex-col bg-zinc-900/30 backdrop-blur-xl border-r border-white/5 text-zinc-400">
+        {/* Header */}
+        <div className="p-4 pt-6">
+          <div className="flex items-center gap-2 mb-6 px-2">
+            <div className="w-6 h-6 rounded-md bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.3)]">
+              <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
+            </div>
+            <span className="font-medium text-zinc-100 tracking-tight">Syllabus</span>
           </div>
-          <span className="font-medium text-zinc-100 tracking-tight">Syllabus</span>
-        </div>
 
-        {/* Search */}
-        <div className="relative group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-indigo-400 transition-colors" />
-          <input 
-            type="text" 
-            placeholder="Search..." 
-            className="w-full bg-black/20 border border-white/5 rounded-lg py-2 pl-9 pr-3 text-sm text-zinc-300 focus:outline-none focus:border-indigo-500/30 focus:bg-indigo-500/5 transition-all placeholder:text-zinc-600"
-          />
-        </div>
-      </div>
-
-      {/* Navigation Tree */}
-      <div className="flex-1 overflow-y-auto px-2 py-2 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
-        <div className="space-y-0.5">
-          <div className="px-3 py-1.5 text-xs font-medium text-zinc-600 uppercase tracking-wider mb-1">
-            Library
+          {/* Search */}
+          <div className="relative group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-indigo-400 transition-colors" />
+            <input 
+              type="text" 
+              placeholder="Search..." 
+              className="w-full bg-black/20 border border-white/5 rounded-lg py-2 pl-9 pr-3 text-sm text-zinc-300 focus:outline-none focus:border-indigo-500/30 focus:bg-indigo-500/5 transition-all placeholder:text-zinc-600"
+            />
           </div>
-          
-          {/* Folders */}
-          {folders.map(folder => (
-            <FolderItem 
-              key={folder.id} 
-              folder={folder} 
-              notebooks={notebooks.filter(n => n.folderId === folder.id)}
-              pages={pages}
-              activePageId={activePageId || undefined}
-              onPageSelect={setActivePage}
-              onDeletePage={handleDeletePage}
-              onAddNotebook={(folderId) => setNamingModal({ isOpen: true, type: "notebook", parentId: folderId })}
-              onAddPage={handleNewPage}
-            />
-          ))}
-
-          {/* Uncategorized Notebooks (if any) */}
-          {notebooks.filter(n => !n.folderId).map(notebook => (
-            <NotebookItem 
-              key={notebook.id} 
-              notebook={notebook} 
-              pages={pages.filter(p => p.notebookId === notebook.id)}
-              activePageId={activePageId || undefined}
-              onPageSelect={setActivePage}
-              onDeletePage={handleDeletePage}
-              onAddPage={handleNewPage}
-            />
-          ))}
         </div>
-      </div>
 
-      {/* Footer Actions */}
-      <div className="p-4 border-t border-white/5 space-y-1">
-        <div className="grid grid-cols-2 gap-2 mb-2">
+        {/* Navigation Tree */}
+        <div className="flex-1 overflow-y-auto px-2 py-2 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+          <div className="space-y-0.5">
+            <div className="px-3 py-1.5 text-xs font-medium text-zinc-600 uppercase tracking-wider mb-1">
+              Library
+            </div>
+            
+            {/* Folders */}
+            {folders.map(folder => (
+              <FolderItem 
+                key={folder.id} 
+                folder={folder} 
+                notebooks={notebooks.filter(n => n.folderId === folder.id)}
+                pages={pages}
+                activePageId={activePageId || undefined}
+                onPageSelect={setActivePage}
+                onDeletePage={handleDeletePage}
+                onDeleteFolder={handleDeleteFolder}
+                onDeleteNotebook={handleDeleteNotebook}
+                onAddNotebook={(folderId) => setNamingModal({ isOpen: true, type: "notebook", parentId: folderId })}
+                onAddPage={handleNewPage}
+              />
+            ))}
+
+            {/* Uncategorized Notebooks (if any) */}
+            {notebooks.filter(n => !n.folderId).map(notebook => (
+              <NotebookItem 
+                key={notebook.id} 
+                notebook={notebook} 
+                pages={pages.filter(p => p.notebookId === notebook.id)}
+                activePageId={activePageId || undefined}
+                onPageSelect={setActivePage}
+                onDeletePage={handleDeletePage}
+                onDeleteNotebook={handleDeleteNotebook}
+                onAddPage={handleNewPage}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Footer Actions */}
+        <div className="p-4 border-t border-white/5 space-y-1">
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <button 
+              onClick={() => setNamingModal({ isOpen: true, type: "folder" })}
+              className="flex items-center justify-center gap-2 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-100 hover:bg-white/5 border border-white/5 rounded-lg transition-colors group"
+              title="New Folder"
+            >
+              <FolderPlus className="w-3.5 h-3.5 group-hover:text-indigo-400 transition-colors" />
+              <span>Folder</span>
+            </button>
+            <button 
+              onClick={() => setNamingModal({ isOpen: true, type: "notebook" })}
+              className="flex items-center justify-center gap-2 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-100 hover:bg-white/5 border border-white/5 rounded-lg transition-colors group"
+              title="New Notebook"
+            >
+              <BookPlus className="w-3.5 h-3.5 group-hover:text-indigo-400 transition-colors" />
+              <span>Notebook</span>
+            </button>
+          </div>
           <button 
-            onClick={() => setNamingModal({ isOpen: true, type: "folder" })}
-            className="flex items-center justify-center gap-2 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-100 hover:bg-white/5 border border-white/5 rounded-lg transition-colors group"
-            title="New Folder"
+            onClick={() => setShowSettings(true)}
+            className="flex items-center gap-3 w-full px-3 py-2 text-sm text-zinc-400 hover:text-zinc-100 hover:bg-white/5 rounded-lg transition-colors group"
           >
-            <FolderPlus className="w-3.5 h-3.5 group-hover:text-indigo-400 transition-colors" />
-            <span>Folder</span>
+            <Settings className="w-4 h-4 group-hover:text-indigo-400 transition-colors" />
+            <span>Settings</span>
           </button>
           <button 
-            onClick={() => setNamingModal({ isOpen: true, type: "notebook" })}
-            className="flex items-center justify-center gap-2 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-100 hover:bg-white/5 border border-white/5 rounded-lg transition-colors group"
-            title="New Notebook"
+            onClick={() => handleNewPage()}
+            className="flex items-center gap-3 w-full px-3 py-2 text-sm text-zinc-400 hover:text-zinc-100 hover:bg-white/5 rounded-lg transition-colors group"
           >
-            <BookPlus className="w-3.5 h-3.5 group-hover:text-indigo-400 transition-colors" />
-            <span>Notebook</span>
+            <Plus className="w-4 h-4 group-hover:text-indigo-400 transition-colors" />
+            <span>New Page</span>
           </button>
         </div>
-        <button 
-          onClick={() => setShowSettings(true)}
-          className="flex items-center gap-3 w-full px-3 py-2 text-sm text-zinc-400 hover:text-zinc-100 hover:bg-white/5 rounded-lg transition-colors group"
-        >
-          <Settings className="w-4 h-4 group-hover:text-indigo-400 transition-colors" />
-          <span>Settings</span>
-        </button>
-        <button 
-          onClick={() => handleNewPage()}
-          className="flex items-center gap-3 w-full px-3 py-2 text-sm text-zinc-400 hover:text-zinc-100 hover:bg-white/5 rounded-lg transition-colors group"
-        >
-          <Plus className="w-4 h-4 group-hover:text-indigo-400 transition-colors" />
-          <span>New Page</span>
-        </button>
-      </div>
 
-      <NamingModal
-        isOpen={namingModal.isOpen}
-        onClose={() => setNamingModal({ ...namingModal, isOpen: false })}
-        onConfirm={handleCreateNaming}
-        title={`Create New ${namingModal.type === "folder" ? "Folder" : "Notebook"}`}
-        placeholder={`Enter ${namingModal.type} name...`}
-      />
+        <NamingModal
+          isOpen={namingModal.isOpen}
+          onClose={() => setNamingModal({ ...namingModal, isOpen: false })}
+          onConfirm={handleCreateNaming}
+          title={`Create New ${namingModal.type === "folder" ? "Folder" : "Notebook"}`}
+          placeholder={`Enter ${namingModal.type} name...`}
+        />
+      </aside>
       <SettingsModal
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
       />
-    </aside>
+    </>
   );
 }
 
-function FolderItem({ folder, notebooks, pages, activePageId, onPageSelect, onDeletePage, onAddNotebook, onAddPage }: { 
+function FolderItem({ folder, notebooks, pages, activePageId, onPageSelect, onDeletePage, onDeleteFolder, onDeleteNotebook, onAddNotebook, onAddPage }: { 
   folder: Folder, 
   notebooks: Notebook[],
   pages: Page[],
   activePageId?: string,
   onPageSelect: (id: string) => void,
   onDeletePage: (id: string) => void,
+  onDeleteFolder: (id: string) => void,
+  onDeleteNotebook: (id: string) => void,
   onAddNotebook: (folderId: string) => void,
   onAddPage: (notebookId: string) => void
 }) {
@@ -226,13 +249,22 @@ function FolderItem({ folder, notebooks, pages, activePageId, onPageSelect, onDe
           <FolderIcon className="w-4 h-4 mr-2 text-zinc-400 group-hover:text-indigo-300 transition-colors" />
           <span className="truncate font-medium">{folder.name}</span>
         </button>
-        <button
-          onClick={() => onAddNotebook(folder.id)}
-          className="p-1.5 opacity-0 group-hover/folder:opacity-100 text-zinc-500 hover:text-zinc-200 transition-all mr-1"
-          title="New Notebook in Folder"
-        >
-          <BookPlus className="w-3.5 h-3.5" />
-        </button>
+        <div className="flex items-center opacity-0 group-hover/folder:opacity-100 transition-opacity">
+            <button
+            onClick={() => onAddNotebook(folder.id)}
+            className="p-1.5 text-zinc-500 hover:text-zinc-200 transition-all"
+            title="New Notebook in Folder"
+            >
+            <BookPlus className="w-3.5 h-3.5" />
+            </button>
+            <button
+            onClick={() => onDeleteFolder(folder.id)}
+            className="p-1.5 text-zinc-500 hover:text-rose-400 transition-all"
+            title="Delete Folder"
+            >
+            <Trash2 className="w-3.5 h-3.5" />
+            </button>
+        </div>
       </div>
 
       <AnimatePresence 
@@ -258,6 +290,7 @@ function FolderItem({ folder, notebooks, pages, activePageId, onPageSelect, onDe
                   activePageId={activePageId}
                   onPageSelect={onPageSelect}
                   onDeletePage={onDeletePage}
+                  onDeleteNotebook={onDeleteNotebook}
                   onAddPage={onAddPage}
                 />
               ))}
@@ -272,12 +305,13 @@ function FolderItem({ folder, notebooks, pages, activePageId, onPageSelect, onDe
   );
 }
 
-function NotebookItem({ notebook, pages, activePageId, onPageSelect, onDeletePage, onAddPage }: { 
+function NotebookItem({ notebook, pages, activePageId, onPageSelect, onDeletePage, onDeleteNotebook, onAddPage }: { 
   notebook: Notebook, 
   pages: Page[],
   activePageId?: string,
   onPageSelect: (id: string) => void,
   onDeletePage: (id: string) => void,
+  onDeleteNotebook: (id: string) => void,
   onAddPage: (notebookId: string) => void
 }) {
   const [isOpen, setIsOpen] = useState(true);
@@ -296,13 +330,22 @@ function NotebookItem({ notebook, pages, activePageId, onPageSelect, onDeletePag
           <Book className="w-3.5 h-3.5 mr-2 text-zinc-500 group-hover:text-indigo-400/70 transition-colors" />
           <span className="truncate">{notebook.name}</span>
         </button>
-        <button
-          onClick={() => onAddPage(notebook.id)}
-          className="p-1.5 opacity-0 group-hover/notebook:opacity-100 text-zinc-500 hover:text-zinc-200 transition-all mr-1"
-          title="New Page in Notebook"
-        >
-          <Plus className="w-3.5 h-3.5" />
-        </button>
+        <div className="flex items-center opacity-0 group-hover/notebook:opacity-100 transition-opacity">
+            <button
+            onClick={() => onAddPage(notebook.id)}
+            className="p-1.5 text-zinc-500 hover:text-zinc-200 transition-all"
+            title="New Page in Notebook"
+            >
+            <Plus className="w-3.5 h-3.5" />
+            </button>
+            <button
+            onClick={() => onDeleteNotebook(notebook.id)}
+            className="p-1.5 text-zinc-500 hover:text-rose-400 transition-all"
+            title="Delete Notebook"
+            >
+            <Trash2 className="w-3.5 h-3.5" />
+            </button>
+        </div>
       </div>
 
       <AnimatePresence 

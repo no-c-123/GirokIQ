@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Palette, PenTool, Keyboard, Database, Search } from "lucide-react";
+import { X, Palette, PenTool, Keyboard, Database, Search, Trash2 } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { useUIStore } from "../../stores/useUIStore";
 import { useKeyboardShortcuts } from "../../ui/hooks/useKeyboardShortcuts";
@@ -44,7 +44,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-4xl h-150 bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl flex overflow-hidden"
+            className="relative w-full max-w-4xl h-150 bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl flex overflow-hidden z-10"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Sidebar */}
@@ -206,21 +206,41 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   <div className="space-y-8">
                     <section>
                       <h5 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-4">Storage & Cache</h5>
-                      <button 
-                        onClick={() => {
-                          if (confirm("Are you sure you want to reset all settings?")) {
-                            updateSettings({
-                              theme: "dark",
-                              autosaveInterval: 30,
-                              defaultPenColor: "#a78bfa",
-                              defaultPenWidth: 2,
-                            });
-                          }
-                        }}
-                        className="w-full p-4 bg-red-500/5 hover:bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm font-medium transition-colors text-left"
-                      >
-                        Reset All Preferences
-                      </button>
+                      <div className="space-y-3">
+                        <button 
+                          onClick={async () => {
+                            if (confirm("Are you sure? This will delete all your notes and drawings permanently. This action cannot be undone.")) {
+                              const { db } = await import("../../db");
+                              await db.delete();
+                              localStorage.clear();
+                              window.location.reload();
+                            }
+                          }}
+                          className="w-full p-4 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-xl text-red-400 text-sm font-medium transition-colors text-left flex items-center justify-between group"
+                        >
+                          <div>
+                            <div className="font-bold">Clear All Data & Reset</div>
+                            <div className="text-xs opacity-60">Permanently delete all notebooks and reset preferences</div>
+                          </div>
+                          <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                        </button>
+
+                        <button 
+                          onClick={() => {
+                            if (confirm("Are you sure you want to reset all settings? Your notes will be kept.")) {
+                              updateSettings({
+                                theme: "dark",
+                                autosaveInterval: 30,
+                                defaultPenColor: "#a78bfa",
+                                defaultPenWidth: 2,
+                              });
+                            }
+                          }}
+                          className="w-full p-4 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-zinc-300 text-sm font-medium transition-colors text-left"
+                        >
+                          Reset Preferences Only
+                        </button>
+                      </div>
                     </section>
                   </div>
                 )}

@@ -26,9 +26,12 @@ interface AppState {
   addPage: (page: Page) => Promise<void>;
   deletePage: (id: string) => Promise<void>;
   renamePage: (id: string, title: string) => Promise<void>;
+  toggleStar: (id: string) => Promise<void>;
 
   addFolder: (folder: Folder) => Promise<void>;
   addNotebook: (notebook: Notebook) => Promise<void>;
+  deleteFolder: (id: string) => Promise<void>;
+  deleteNotebook: (id: string) => Promise<void>;
   
   // Actions to populate data
   setFolders: (folders: Folder[]) => void;
@@ -169,6 +172,18 @@ export const useAppStore = create<AppState>((set) => ({
     }));
   },
 
+  toggleStar: async (id) => {
+    const existing = await db.pages.get(id);
+    if (!existing) return;
+
+    const updated: Page = { ...existing, starred: !existing.starred, updatedAt: Date.now() };
+    await db.pages.put(updated);
+
+    set((state) => ({
+      pages: state.pages.map((p) => (p.id === id ? updated : p)),
+    }));
+  },
+
   addFolder: async (folder) => {
     await db.folders.put(folder);
     set((state) => ({ folders: [...state.folders, folder] }));
@@ -177,6 +192,95 @@ export const useAppStore = create<AppState>((set) => ({
   addNotebook: async (notebook) => {
     await db.notebooks.put(notebook);
     set((state) => ({ notebooks: [...state.notebooks, notebook] }));
+  },
+
+  deleteFolder: async (id) => {
+    // 1. Delete the folder itself
+    await db.folders.delete(id);
+
+    // 2. Find all notebooks in this folder
+    const notebooksToDelete = await db.notebooks.where("folderId").equals(id).toArray();
+    const notebookIds = notebooksToDelete.map((n) => n.id);
+
+    // 3. For each notebook, find all pages
+    const pagesToDelete = await db.pages.where("notebookId").anyOf(notebookIds).toArray();
+    const pageIds = pagesToDelete.map((p) => p.id);
+
+    // 4. Delete notebooks and pages
+    await db.notebooks.bulkDelete(notebookIds);
+    await db.pages.bulkDelete(pageIds);
+
+    // 5. Delete strokes and blocks for these pages
+    if (pageIds.length > 0) {
+      await db.strokes.where("pageId").anyOf(pageIds).delete();
+      await db.blocks.where("pageId").anyOf(pageIds).delete();
+    }
+
+    set((state) => {
+      const newFolders = state.folders.filter((f) => f.id !== id);
+      const newNotebooks = state.notebooks.filter((n) => !notebookIds.includes(n.id));
+      const newPages = state.pages.filter((p) => !pageIds.includes(p.id));
+
+      // Handle active page deletion
+      let newActiveId = state.activePageId;
+      if (state.activePageId && pageIds.includes(state.activePageId)) {
+        newActiveId = newPages.length > 0 ? newPages[0].id : null;
+      }
+      
+      void db.appState.put({
+        key: "activePageId",
+        value: newActiveId,
+        updatedAt: Date.now(),
+      });
+
+      return {
+        folders: newFolders,
+        notebooks: newNotebooks,
+        pages: newPages,
+        activePageId: newActiveId,
+      };
+    });
+  },
+
+  deleteNotebook: async (id) => {
+    // 1. Delete the notebook itself
+    await db.notebooks.delete(id);
+
+    // 2. Find all pages in this notebook
+    const pagesToDelete = await db.pages.where("notebookId").equals(id).toArray();
+    const pageIds = pagesToDelete.map((p) => p.id);
+
+    // 3. Delete pages
+    await db.pages.bulkDelete(pageIds);
+
+    // 4. Delete strokes and blocks for these pages
+    if (pageIds.length > 0) {
+      await db.strokes.where("pageId").anyOf(pageIds).delete();
+      await db.blocks.where("pageId").anyOf(pageIds).delete();
+    }
+
+    set((state) => {
+      const newNotebooks = state.notebooks.filter((n) => n.id !== id);
+      const newPages = state.pages.filter((p) => !pageIds.includes(p.id));
+
+      // Handle active page deletion
+      let newActiveId = state.activePageId;
+      if (state.activePageId && pageIds.includes(state.activePageId)) {
+        newActiveId = newPages.length > 0 ? newPages[0].id : null;
+      }
+
+      void db.appState.put({
+        key: "activePageId",
+        value: newActiveId,
+        updatedAt: Date.now(),
+      });
+
+      return {
+        notebooks: newNotebooks,
+        pages: newPages,
+        activePageId: newActiveId,
+      };
+    });
   },
 
   setFolders: (folders) => set({ folders }),
