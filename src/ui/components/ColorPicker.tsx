@@ -10,7 +10,7 @@ import {
   parseRgb,
   rgbToHex,
   rgbToHsl,
-} from "./color";
+} from "../../utils/color";
 
 export function ColorPicker({
   open,
@@ -65,7 +65,7 @@ export function ColorPicker({
   ].slice(0, 18);
 
   return (
-    <div className="absolute bottom-20 left-1/2 -translate-x-1/2 w-[340px] rounded-2xl border border-white/10 bg-zinc-950/90 backdrop-blur-xl shadow-2xl overflow-hidden z-50">
+    <div className="absolute bottom-20 left-1/2 -translate-x-1/2 w-85 rounded-2xl border border-white/10 bg-zinc-950/90 backdrop-blur-xl shadow-2xl overflow-hidden z-50">
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
         <div className="text-sm text-zinc-200 font-medium">Color</div>
         <button

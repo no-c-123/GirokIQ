@@ -1,15 +1,15 @@
 import { Layer } from "react-konva";
-import { ImageBlock } from "../blocks/ImageBlock";
-import { useBlockStore } from "../blocks/useBlockStore";
+import { ImageBlock } from "../../ui/blocks/ImageBlock";
+import { useBlockStore } from "../../stores/useBlockStore";
 import { useMemo, memo } from "react";
-import { useCanvasStore } from "./useCanvasStore";
-import { useAppStore } from "../store/useAppStore";
+import { useUIStore } from "../../stores/useUIStore";
+import { useAppStore } from "../../store/useAppStore";
 
 export const ImageLayer = memo(function ImageLayer() {
   const activePageId = useAppStore((s) => s.activePageId);
   const blocks = useBlockStore((s) => s.blocks);
-  const selectedIds = useCanvasStore((s) => s.selectedIds);
-  const setSelectedIds = useCanvasStore((s) => s.setSelectedIds);
+  const selectedIds = useUIStore((s) => s.selectedIds);
+  const setSelectedIds = useUIStore((s) => s.setSelectedIds);
 
   const imageBlocks = useMemo(
     () => blocks.filter((b) => b.pageId === activePageId && b.type === "image"),

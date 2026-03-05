@@ -1,6 +1,6 @@
 import type { Action } from "./types";
-import { useBlockStore } from "../blocks/useBlockStore";
-import { useCanvasStore } from "../canvas/useCanvasStore";
+import { useBlockStore } from "../stores/useBlockStore";
+import { useCanvasStore } from "../stores/useCanvasStore";
 
 export async function applyUndo(action: Action) {
   const blocks = useBlockStore.getState();
@@ -17,10 +17,10 @@ export async function applyUndo(action: Action) {
       await blocks.addExistingBlock(action.block);
       break;
     case "ADD_STROKE":
-      await canvas.removeStroke(action.stroke.id);
+      canvas.removeElement(action.stroke.id);
       break;
     case "DELETE_STROKE":
-      await canvas.addStroke(action.stroke);
+      canvas.addElement(action.stroke);
       break;
   }
 }
@@ -40,10 +40,10 @@ export async function applyRedo(action: Action) {
       await blocks.deleteBlock(action.block.id);
       break;
     case "ADD_STROKE":
-      await canvas.addStroke(action.stroke);
+      canvas.addElement(action.stroke);
       break;
     case "DELETE_STROKE":
-      await canvas.removeStroke(action.stroke.id);
+      canvas.removeElement(action.stroke.id);
       break;
   }
 }

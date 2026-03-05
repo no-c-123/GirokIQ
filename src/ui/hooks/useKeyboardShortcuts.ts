@@ -1,8 +1,9 @@
 import { useEffect } from "react";
-import { useAppStore } from "../store/useAppStore";
-import { useCanvasStore } from "../canvas/useCanvasStore";
-import { useHistoryStore } from "../history/useHistoryStore";
-import { useBlockStore } from "../blocks/useBlockStore";
+import { useAppStore } from "../../store/useAppStore";
+import { useCanvasStore } from "../../stores/useCanvasStore";
+import { useUIStore } from "../../stores/useUIStore";
+import { useHistoryStore } from "../../history/useHistoryStore";
+import { useBlockStore } from "../../stores/useBlockStore";
 
 export interface Shortcut {
   id: string;
@@ -14,7 +15,8 @@ export interface Shortcut {
 
 export function useKeyboardShortcuts() {
   const { setSidebarVisible, sidebarVisible } = useAppStore();
-  const { setTool, setSelectedIds, selectedIds, strokes, removeStroke } = useCanvasStore();
+  const { setTool, setSelectedIds, selectedIds } = useUIStore();
+  const { elements, removeElement } = useCanvasStore();
   const { undo, redo } = useHistoryStore();
   const { deleteBlock, selectedBlockId } = useBlockStore();
 
@@ -49,8 +51,8 @@ export function useKeyboardShortcuts() {
         // Delete selected strokes
         if (selectedIds.length > 0) {
           selectedIds.forEach(id => {
-            if (strokes.some(s => s.id === id)) {
-              void removeStroke(id);
+            if (elements.some(s => s.id === id)) {
+              void removeElement(id);
             } else {
               void deleteBlock(id);
             }

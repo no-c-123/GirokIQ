@@ -1,4 +1,4 @@
-import { db } from "./db";
+import { db } from "../db";
 
 export async function seedIfEmpty() {
     const folderCount = await db.folders.count();

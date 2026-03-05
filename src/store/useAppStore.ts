@@ -1,9 +1,9 @@
 import { create } from "zustand";
 import { db } from "../db";
 import { seedIfEmpty } from "../data/seed";
-import type { Folder } from "../data/models/folder";
-import type { Notebook } from "../data/models/notebook";
-import type { Page } from "../data/models/page";
+import type { Folder } from "../data/types";
+import type { Notebook } from "../data/types";
+import type { Page } from "../pages/types";
 
 interface AppState {
   folders: Folder[];

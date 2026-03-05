@@ -1,6 +1,6 @@
 import { Camera, Type } from "lucide-react";
-import { useCanvasStore } from "../canvas/useCanvasStore";
-import { useBlockStore } from "../blocks/useBlockStore";
+import { useCanvasStore } from "../../stores/useCanvasStore";
+import { useBlockStore } from "../../stores/useBlockStore";
 import { Stage } from "konva/lib/Stage";
 
 interface ViewState {
@@ -52,7 +52,7 @@ export function LassoActionsOverlay({
             pixelRatio: 2
           });
           
-          const activePageId = useCanvasStore.getState().strokes.find(s => selectedIds.includes(s.id))?.pageId 
+          const activePageId = useCanvasStore.getState().elements.find(s => selectedIds.includes(s.id))?.pageId 
                               || useBlockStore.getState().blocks.find(b => selectedIds.includes(b.id))?.pageId;
 
           if (activePageId) {

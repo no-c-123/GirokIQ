@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef } from "react";
-import { Sidebar } from "../components/Sidebar";
-import { Canvas } from "../components/Canvas";
-import { NewPageModal } from "../components/NewPageModal";
+import { Sidebar } from "../ui/components/Sidebar";
+import { Editor } from "../editor/Editor";
+import { NewPageModal } from "../ui/components/NewPageModal";
 import { useAppStore } from "../store/useAppStore";
-import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
+import { useKeyboardShortcuts } from "../ui/hooks/useKeyboardShortcuts";
 import { Plus, ArrowDown } from "lucide-react";
 
 export default function App() {
@@ -163,7 +163,7 @@ export default function App() {
       <main className="relative z-10 flex-1 h-full min-w-0 transition-all duration-300 ease-in-out">
         {/* Pull to refresh visual feedback */}
         <div 
-          className="absolute top-0 left-0 right-0 flex justify-center pointer-events-none z-[60]"
+          className="absolute top-0 left-0 right-0 flex justify-center pointer-events-none z-60"
           style={{ transform: `translateY(${pullDistance - 40}px)`, opacity: pullDistance / PULL_THRESHOLD }}
         >
           <div className={`flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900 border border-white/10 shadow-xl transition-colors ${pullDistance >= PULL_THRESHOLD ? 'text-indigo-400 border-indigo-500/30' : 'text-zinc-500'}`}>
@@ -174,7 +174,7 @@ export default function App() {
           </div>
         </div>
 
-        <Canvas 
+        <Editor 
           key={activePage?.id ?? "empty"}
           page={activePage} 
           notebook={activeNotebook}

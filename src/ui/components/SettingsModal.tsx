@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Palette, PenTool, Keyboard, Database, Search } from "lucide-react";
-import { useAppStore } from "../store/useAppStore";
-import { useCanvasStore } from "../canvas/useCanvasStore";
-import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
-import { cn } from "../lib/utils";
+import { useAppStore } from "../../store/useAppStore";
+import { useUIStore } from "../../stores/useUIStore";
+import { useKeyboardShortcuts } from "../../ui/hooks/useKeyboardShortcuts";
+import { cn } from "../../utils";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -19,7 +19,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     setShapeRecognitionEnabled,
     selectionFilter,
     setSelectionFilter
-  } = useCanvasStore();
+  } = useUIStore();
   const { shortcuts } = useKeyboardShortcuts();
   const [shortcutSearch, setShortcutSearch] = useState("");
 
@@ -31,7 +31,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -44,7 +44,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-4xl h-[600px] bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl flex overflow-hidden"
+            className="relative w-full max-w-4xl h-150 bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl flex overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Sidebar */}
@@ -189,10 +189,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                             <div className="text-zinc-200 font-medium">{s.description}</div>
                             <div className="text-[10px] text-zinc-500 uppercase tracking-widest">{s.category}</div>
                           </div>
-                          <div className="flex gap-1">
-                            {s.keys.map(k => (
-                              <kbd key={k} className="px-2 py-1 bg-zinc-800 border border-white/10 rounded text-[10px] text-zinc-300 font-mono min-w-[24px] text-center capitalize">
-                                {k === "meta" ? "⌘" : k === "shift" ? "⇧" : k}
+                          <div className="flex items-center gap-1.5">
+                            {s.keys.map((key, i) => (
+                              <kbd key={i} className="px-1.5 py-0.5 bg-white/10 rounded text-[10px] font-mono text-zinc-300 min-w-6 text-center border border-white/5">
+                                {key === "meta" ? (navigator.platform.includes("Mac") ? "⌘" : "Ctrl") : key.toUpperCase()}
                               </kbd>
                             ))}
                           </div>

@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { cn } from "../lib/utils";
-import { useBlockStore } from "./useBlockStore";
-import { useHistoryStore } from "../history/useHistoryStore";
-import { useCanvasStore } from "../canvas/useCanvasStore";
-import type { Block } from "../data/models/block";
+import { cn } from "../../utils";
+import { useBlockStore } from "../../stores/useBlockStore";
+import { useHistoryStore } from "../../history/useHistoryStore";
+import { useUIStore } from "../../stores/useUIStore";
+import type { Block } from "../../data/models/block";
 import { Trash2 } from "lucide-react";
 
 export function TextBlock({ block }: { block: Block }) {
@@ -176,12 +176,12 @@ export function TextBlock({ block }: { block: Block }) {
             dragStartedRef.current = false;
             setDragging(true);
           } else {
-            const selectedIds = useCanvasStore.getState().selectedIds;
+            const selectedIds = useUIStore.getState().selectedIds;
             if (e.shiftKey) {
-              useCanvasStore.getState().setSelectedIds([...selectedIds, block.id]);
+              useUIStore.getState().setSelectedIds([...selectedIds, block.id]);
             } else {
               selectBlock(block.id);
-              useCanvasStore.getState().setSelectedIds([block.id]);
+              useUIStore.getState().setSelectedIds([block.id]);
             }
           }
         }}
@@ -203,7 +203,7 @@ export function TextBlock({ block }: { block: Block }) {
         }}
         className={cn(
           "w-full h-full bg-transparent resize outline-none text-zinc-100 placeholder-zinc-500 leading-relaxed text-base rounded-md transition-shadow border border-dashed border-white/10",
-          "focus:bg-white/[0.02] px-4 py-4",
+          "focus:bg-white/2 px-4 py-4",
           isSelected ? "border-dashed border-white/20" : " hover:border hover:border-white/20 transition duration-200",
           dragging && "select-none"
         )}

@@ -45,7 +45,7 @@ export function LandingPage({ onGetStarted, onSignIn }: LandingPageProps) {
             <span>Reimagining the digital notebook</span>
           </div>
           
-          <h1 className="text-6xl md:text-8xl font-bold tracking-tight leading-[1.1] bg-gradient-to-b from-white to-zinc-500 bg-clip-text text-transparent">
+          <h1 className="text-6xl md:text-8xl font-bold tracking-tight leading-[1.1] bg-linear-to-b from-white to-zinc-500 bg-clip-text text-transparent">
             Think clearly. <br /> Create freely.
           </h1>
           

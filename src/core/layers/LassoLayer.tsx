@@ -1,7 +1,10 @@
 import { Layer, Rect, Transformer } from "react-konva";
-import { useBlockStore } from "../blocks/useBlockStore";
+import { useBlockStore } from "../../stores/useBlockStore";
 import { useRef, useEffect } from "react";
 import Konva from "konva";
+import type { StrokeElement } from "../../elements/types";
+
+
 
 export function LassoLayer({
   selectionBBox,
@@ -18,7 +21,7 @@ export function LassoLayer({
   updateBlocks: (updates: { id: string; x: number; y: number }[]) => Promise<void>;
   updateStrokes: (updates: { id: string; points: number[] }[]) => Promise<void>;
   updateBlockSize: (id: string, width: number, height: number) => void;
-  strokes: any[];
+  strokes: StrokeElement[];
   selectedIds: string[];
   setSelectedIds: (ids: string[]) => void;
   setSelectionOffset: (offset: { x: number; y: number }) => void;
@@ -26,6 +29,7 @@ export function LassoLayer({
   const isGestureRef = useRef(false);
   const trRef = useRef<Konva.Transformer>(null);
   const rectRef = useRef<Konva.Rect>(null);
+
 
   useEffect(() => {
     if (selectionBBox && trRef.current && rectRef.current) {

@@ -1,5 +1,5 @@
 import { useRef, useCallback } from "react";
-import { ShapeRecognizer, type RecognizedShape } from "../lib/ShapeRecognizer";
+import { ShapeRecognizer, type RecognizedShape } from "../core/ShapeRecognizer";
 
 interface UseShapeSnappingProps {
   onSnap: (shape: RecognizedShape) => void;

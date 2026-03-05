@@ -14,23 +14,23 @@ import {
   Sidebar as SidebarIcon,
   MousePointer2
 } from "lucide-react";
-import { cn } from "../lib/utils";
-import CanvasPage from "../canvas/CanvasPage";
+import { cn } from "../utils";
+import CanvasArea from "./CanvasArea";
 import { useAppStore } from "../store/useAppStore";
-import { useCanvasStore } from "../canvas/useCanvasStore";
-import { ColorPicker } from "../canvas/ColorPicker";
-import { useBlockStore } from "../blocks/useBlockStore";
-import { TextBlock } from "../blocks/TextBlock";
+import { useUIStore } from "../stores/useUIStore";
+import { ColorPicker } from "../ui/components/ColorPicker";
+import { useBlockStore } from "../stores/useBlockStore";
+import { TextBlock } from "../ui/blocks/TextBlock";
 import { useHistoryStore } from "../history/useHistoryStore";
 import type { Page } from "../data/models/page";
 import type { Notebook } from "../data/models/notebook";
 
-interface CanvasProps {
+interface EditorProps {
   page?: Page;
   notebook?: Notebook;
 }
 
-export function Canvas({ page, notebook }: CanvasProps) {
+export function Editor({ page, notebook }: EditorProps) {
   const [title, setTitle] = useState(page?.title || "");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -42,14 +42,15 @@ export function Canvas({ page, notebook }: CanvasProps) {
   const sidebarVisible = useAppStore((s) => s.sidebarVisible);
   const setSidebarVisible = useAppStore((s) => s.setSidebarVisible);
 
-  const tool = useCanvasStore((s) => s.tool);
-  const setTool = useCanvasStore((s) => s.setTool);
-  const color = useCanvasStore((s) => s.color);
-  const strokeWidth = useCanvasStore((s) => s.strokeWidth);
-  const setStrokeWidth = useCanvasStore((s) => s.setStrokeWidth);
-  const presets = useCanvasStore((s) => s.presets);
-  const recentColors = useCanvasStore((s) => s.recentColors);
-  const setColor = useCanvasStore((s) => s.setColor);
+  const tool = useUIStore((s) => s.tool);
+  const setTool = useUIStore((s) => s.setTool);
+  const color = useUIStore((s) => s.color);
+  const strokeWidth = useUIStore((s) => s.strokeWidth);
+  const setStrokeWidth = useUIStore((s) => s.setStrokeWidth);
+  const presets = useUIStore((s) => s.presets);
+  const recentColors = useUIStore((s) => s.recentColors);
+  const setColor = useUIStore((s) => s.setColor);
+  
   const blocks = useBlockStore((s) => s.blocks);
   const hydrateBlocksForPage = useBlockStore((s) => s.hydrateBlocksForPage);
   const addTextBlock = useBlockStore((s) => s.addTextBlock);
@@ -61,6 +62,7 @@ export function Canvas({ page, notebook }: CanvasProps) {
   const undo = useHistoryStore((s) => s.undo);
   const redo = useHistoryStore((s) => s.redo);
   const historyClear = useHistoryStore((s) => s.clear);
+
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -392,7 +394,7 @@ export function Canvas({ page, notebook }: CanvasProps) {
               />
             </div>
           ) : (
-            <CanvasPage
+            <CanvasArea
               onDoubleClickPage={(pageId, x, y) => {
                 void addTextBlock(pageId, x, y).then((block) => {
                   historyPush({ type: "ADD_BLOCK", block });
@@ -405,12 +407,12 @@ export function Canvas({ page, notebook }: CanvasProps) {
                 }
                 return null;
               })}
-            </CanvasPage>
+            </CanvasArea>
           )}
         </div>
 
         {/* Title Overlay */}
-        <div className="absolute top-6 left-6 right-6 pointer-events-none z-[5] w-1/2">
+        <div className="absolute top-6 left-6 right-6 pointer-events-none z-5 w-1/2">
           <input
             type="text"
             value={title}

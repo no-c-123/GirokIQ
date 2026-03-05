@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../../sync/supabase';
 import { ArrowLeft, Loader2, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 
 interface LoginPageProps {
@@ -125,15 +125,15 @@ export function LoginPage({ onBack }: LoginPageProps) {
                 <span className="text-sm font-medium">Back</span>
             </button>
 
-            <div className={`relative w-full max-w-[80%] rounded-3xl shadow-2xl overflow-hidden transition-all duration-500 bg-zinc-900/40 backdrop-blur-xl h-[800px] min-h-[800px]`}>
+            <div className={`relative w-full max-w-[80%] rounded-3xl shadow-2xl overflow-hidden transition-all duration-500 bg-zinc-900/40 backdrop-blur-xl h-200 min-h-200`}>
                 
                 {/* Rotating Border Glow (Behind content) */}
                 <div className="absolute inset-0 pointer-events-none rounded-3xl overflow-hidden z-0">
-                      <div className="absolute inset-[-50%] bg-[conic-gradient(from_var(--border-angle),theme(colors.indigo.600)_80%,_theme(colors.purple.500)_86%,_theme(colors.indigo.300)_90%,_theme(colors.purple.500)_94%,_theme(colors.indigo.600))] animate-[spin_4s_linear_infinite]" />
+                      <div className="absolute inset-[-50%] bg-[conic-gradient(from_var(--border-angle),var(--color-indigo-600)_80%,var(--color-purple-500)_86%,var(--color-indigo-300)_90%,var(--color-purple-500)_94%,var(--color-indigo-600))] animate-[spin_4s_linear_infinite]" />
                 </div>
                 
                 {/* Mask to create border effect */}
-                <div className="absolute inset-[2px] bg-zinc-950 rounded-[22px] z-0" />
+                <div className="absolute inset-0.5 bg-zinc-950 rounded-[22px] z-0" />
 
                 {/* Sliding Overlay */}
                 <div
@@ -180,7 +180,7 @@ export function LoginPage({ onBack }: LoginPageProps) {
                         <section className="text-white flex flex-col justify-center items-center w-full px-8 max-w-md">
                             {isForgotPassword ? (
                                 <>
-                                    <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent mb-6">Reset Password</h1>
+                                    <h1 className="text-3xl font-bold bg-linear-to-r from-white to-zinc-400 bg-clip-text text-transparent mb-6">Reset Password</h1>
                                     <form className="w-full flex flex-col gap-5" onSubmit={handleResetPassword}>
                                         <div className="group">
                                             <label className="block mb-1.5 text-xs font-medium text-zinc-400 uppercase tracking-wider">
@@ -221,7 +221,7 @@ export function LoginPage({ onBack }: LoginPageProps) {
                                 </>
                             ) : (
                                 <>
-                                    <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent mb-2">Welcome Back</h1>
+                                    <h1 className="text-3xl font-bold bg-linear-to-r from-white to-zinc-400 bg-clip-text text-transparent mb-2">Welcome Back</h1>
                                     <p className="text-zinc-500 mb-8 text-sm">Enter your credentials to access your workspace</p>
                                     
                                     <form className="w-full flex flex-col gap-5" onSubmit={handleLogin}>

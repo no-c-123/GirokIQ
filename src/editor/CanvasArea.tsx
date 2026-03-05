@@ -4,26 +4,29 @@ import type { KonvaEventObject } from "konva/lib/Node";
 import { Minus, Plus } from "lucide-react";
 import { nanoid } from "nanoid";
 import { useShapeSnapping } from "../hooks/useShapeSnapping";
-import type { RecognizedShape } from "../lib/ShapeRecognizer";
-import { isStrokeInPolygon, isRectInPolygon } from "../lib/selection";
-import { useCanvasStore } from "./useCanvasStore";
-import { useBlockStore } from "../blocks/useBlockStore";
+import type { RecognizedShape } from "../core/ShapeRecognizer";
+import { isStrokeInPolygon, isRectInPolygon } from "../selection/selectionGeometry";
+import { useCanvasStore } from "../stores/useCanvasStore";
+import { useUIStore } from "../stores/useUIStore";
+import { useBlockStore } from "../stores/useBlockStore";
 import { useHistoryStore } from "../history/useHistoryStore";
 import { useAppStore } from "../store/useAppStore";
-import { DrawingLayer } from "./DrawingLayer";
-import { GridLayer } from "./GridLayer";
-import { ImageLayer } from "./ImageLayer";
+import { DrawingLayer } from "../core/layers/DrawingLayer";
+import { GridLayer } from "../core/layers/GridLayer";
+import { ImageLayer } from "../core/layers/ImageLayer";
 import { useImagePaste } from "../hooks/useImagePaste";
-import { ImageSelectionOverlay } from "../components/ImageSelectionOverlay";
-import { LassoActionsOverlay } from "../components/LassoActionsOverlay";
-import { LassoLayer } from "./LassoLayer";
+import { ImageSelectionOverlay } from "../ui/overlays/ImageSelectionOverlay";
+import { LassoActionsOverlay } from "../ui/overlays/LassoActionsOverlay";
+import { LassoLayer } from "../core/layers/LassoLayer";
 import Konva from "konva";
+import type { StrokeElement } from "../elements/types";
 
 const ZOOM_MIN = 0.1;
 const ZOOM_MAX = 10;
 const ZOOM_ANIMATION_MS = 200;
+const ERASE_RADIUS = 10;
 
-export default function CanvasPage({
+export default function CanvasArea({
   children,
   onDoubleClickPage,
 }: {
@@ -35,18 +38,46 @@ export default function CanvasPage({
   const updateBlocks = useBlockStore((s) => s.updateBlocks);
   const updateBlockSize = useBlockStore((s) => s.updateBlockSize);
   const historyPush = useHistoryStore((s) => s.push);
-  const {
-    strokes,
-    tool,
-    strokeWidth,
-    color,
-    hydrateStrokesForPage,
-    eraseAtPoint,
-    selectedIds,
-    setSelectedIds,
-    selectionFilter,
-    updateStrokes,
-  } = useCanvasStore();
+  
+  const elements = useCanvasStore((s) => s.elements);
+  const addElement = useCanvasStore((s) => s.addElement);
+  const removeElement = useCanvasStore((s) => s.removeElement);
+  const updateElement = useCanvasStore((s) => s.updateElement);
+
+  const strokes = useMemo(() => elements.filter((e): e is StrokeElement => e.type === 'stroke'), [elements]);
+
+  const tool = useUIStore((s) => s.tool);
+  const strokeWidth = useUIStore((s) => s.strokeWidth);
+  const color = useUIStore((s) => s.color);
+  
+  // TODO: Migrate these to proper stores
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const selectionFilter = { images: true, text: true, strokes: true }; 
+  const hydrateStrokesForPage = async (_pageId: string) => { /* TODO: Implement in data layer */ };
+  
+  const updateStrokes = async (updates: { id: string; points: number[] }[]) => {
+      updates.forEach(u => updateElement(u.id, { points: u.points }));
+  };
+
+  const eraseAtPoint = (pageId: string, point: { x: number; y: number }) => {
+    const eraseRadiusSquared = ERASE_RADIUS * ERASE_RADIUS;
+    const strokeToErase = strokes.find((stroke) => {
+      if (stroke.pageId !== pageId) return false;
+      for (let index = 0; index < stroke.points.length; index += 2) {
+        const dx = stroke.points[index] - point.x;
+        const dy = stroke.points[index + 1] - point.y;
+        if (dx * dx + dy * dy <= eraseRadiusSquared) return true;
+      }
+      return false;
+    });
+
+    if (strokeToErase) {
+      removeElement(strokeToErase.id);
+      return strokeToErase;
+    }
+    return null;
+  };
+
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -109,7 +140,7 @@ export default function CanvasPage({
     const snapHook = useShapeSnapping({
         onSnap: onSnapShape,
         onCancel: onCancelSnap,
-        enabled: useCanvasStore((s) => s.shapeRecognitionEnabled)
+        enabled: useUIStore((s) => s.shapeRecognitionEnabled)
     });
 
    const getSelectionBBox = () => {
@@ -652,7 +683,7 @@ export default function CanvasPage({
 
       const snapped = snapHook.getSnappedShape();
       if (snapped) {
-          finalPoints = snapped.points.flatMap(p => [p.x, p.y]);
+          finalPoints = snapped.points.flatMap((p: {x: number, y: number}) => [p.x, p.y]);
           finalShapeType = snapped.type;
           finalOriginalPoints = [...tempPointsRef.current];
       }
@@ -660,21 +691,15 @@ export default function CanvasPage({
       snapHook.cancelSnap();
       
       // Save final stroke to store
-      const finalStroke = {
-          ...current,
+      const finalStroke: StrokeElement = {
+          ...(current as any),
           points: finalPoints,
           shapeType: finalShapeType,
           originalPoints: finalOriginalPoints,
+          type: "stroke" // Ensure type is set
       };
       
-      // We manually add it to store instead of calling endStroke which relied on state
-      // Use set to ensure immediate update, but we also need to trigger re-render
-      // for the DrawingLayer to see the new stroke in its props
-      useCanvasStore.setState(state => ({
-          strokes: [...state.strokes, finalStroke],
-          currentStroke: null
-      }));
-      void useCanvasStore.getState().addStroke(finalStroke);
+      addElement(finalStroke);
       
       historyPush({ type: "ADD_STROKE", stroke: finalStroke });
       

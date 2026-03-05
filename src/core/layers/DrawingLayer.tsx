@@ -1,8 +1,8 @@
 import { Layer, Group, Path } from "react-konva";
-import type { Stroke } from "./useCanvasStore";
+import type { StrokeElement } from "../../elements/types";
 import { useMemo, useRef, useEffect, memo } from "react";
 import Konva from "konva";
-import { QuadTree } from "../lib/QuadTree";
+import { QuadTree } from "../../spatial/QuadTree";
 
 const TILE_SIZE = 1024;
 
@@ -47,7 +47,7 @@ export function getSmoothSvgPath(points: number[]) {
   return d;
 }
 
-export function getPathData(stroke: Stroke) {
+export function getPathData(stroke: StrokeElement) {
   if (stroke.shapeType) {
       if (stroke.points.length < 2) return "";
       let d = `M ${stroke.points[0]} ${stroke.points[1]}`;
@@ -69,8 +69,8 @@ export function DrawingLayer({
   selectionOffset = { x: 0, y: 0 },
   viewport,
 }: {
-  strokes: Stroke[];
-  currentStroke: Stroke | null;
+  strokes: StrokeElement[];
+  currentStroke: StrokeElement | null;
   selectedIds?: string[];
   selectionOffset?: { x: number; y: number };
   viewport?: Viewport;
@@ -83,7 +83,7 @@ export function DrawingLayer({
     const maxX = 1000000;
     const maxY = 1000000;
 
-    const qt = new QuadTree<Stroke>({
+    const qt = new QuadTree<StrokeElement>({
         x: minX,
         y: minY,
         width: maxX - minX,
@@ -240,7 +240,7 @@ export function DrawingLayer({
 }
 
 // Separate component for each tile to handle its own caching
-const Tile = memo(function Tile({ x, y, strokes }: { x: number, y: number, strokes: Stroke[] }) {
+const Tile = memo(function Tile({ x, y, strokes }: { x: number, y: number, strokes: StrokeElement[] }) {
     const groupRef = useRef<Konva.Group>(null);
 
     const paths = useMemo(() => {

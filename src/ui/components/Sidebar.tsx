@@ -15,11 +15,11 @@ import {
   BookPlus
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { cn } from "../lib/utils";
-import type { Folder } from "../data/models/folder";
-import type { Notebook } from "../data/models/notebook";
-import type { Page } from "../data/models/page";
-import { useAppStore } from "../store/useAppStore";
+import { cn } from "../../utils";
+import type { Folder } from "../../data/types";
+import type { Notebook } from "../../data/types";
+import type { Page } from "../../pages/types";
+import { useAppStore } from "../../store/useAppStore";
 import { NamingModal } from "./NamingModal";
 import { SettingsModal } from "./SettingsModal";
 
@@ -91,7 +91,7 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="h-full w-[280px] flex flex-col bg-zinc-900/30 backdrop-blur-xl border-r border-white/5 text-zinc-400">
+    <aside className="h-full w-70 flex flex-col bg-zinc-900/30 backdrop-blur-xl border-r border-white/5 text-zinc-400">
       {/* Header */}
       <div className="p-4 pt-6">
         <div className="flex items-center gap-2 mb-6 px-2">

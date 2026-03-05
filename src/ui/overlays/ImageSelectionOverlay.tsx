@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Trash2 } from "lucide-react";
-import { useBlockStore } from "../blocks/useBlockStore";
-import { useCanvasStore } from "../canvas/useCanvasStore";
+import { useBlockStore } from "../../stores/useBlockStore";
+import { useUIStore } from "../../stores/useUIStore";
 
 interface ViewState {
   position: { x: number; y: number };
@@ -15,8 +15,8 @@ interface ImageSelectionOverlayProps {
 export function ImageSelectionOverlay({ view, stageScale }: ImageSelectionOverlayProps) {
   const blocks = useBlockStore((s) => s.blocks);
   const deleteBlock = useBlockStore((s) => s.deleteBlock);
-  const selectedIds = useCanvasStore((s) => s.selectedIds);
-  const setSelectedIds = useCanvasStore((s) => s.setSelectedIds);
+  const selectedIds = useUIStore((s) => s.selectedIds);
+  const setSelectedIds = useUIStore((s) => s.setSelectedIds);
 
   const selectedBlock = useMemo(
     () => (selectedIds.length === 1 ? blocks.find((b) => b.id === selectedIds[0]) : null),

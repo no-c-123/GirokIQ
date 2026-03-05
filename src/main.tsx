@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import './index.css'
 import { LandingPage } from './landing/LandingPage.tsx'
-import { LoginPage } from './components/LoginPage.tsx'
+import { LoginPage } from './ui/components/LoginPage.tsx'
 import App from './app/App.tsx'
 import { useAuthStore } from './store/useAuthStore'
 
