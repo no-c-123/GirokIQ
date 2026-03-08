@@ -1,5 +1,5 @@
 import type { StrokeElement } from "@/elements/types";
-import type { Block } from "@/data/models/block";
+import type { CanvasElement } from "@/data/models/canvas";
 
 export type Action =
   | {
@@ -12,15 +12,14 @@ export type Action =
     }
   | {
       type: "ADD_BLOCK";
-      block: Block;
+      block: CanvasElement;
     }
   | {
       type: "UPDATE_BLOCK";
-      before: Block;
-      after: Block;
+      before: CanvasElement;
+      after: CanvasElement;
     }
   | {
       type: "DELETE_BLOCK";
-      block: Block;
+      block: CanvasElement;
     };
-

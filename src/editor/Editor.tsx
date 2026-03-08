@@ -252,7 +252,7 @@ export function Editor({ page, notebook }: EditorProps) {
               <textarea
                 className="w-full h-full bg-transparent text-zinc-100 placeholder:text-zinc-800 text-lg leading-relaxed outline-none resize-none"
                 placeholder="Start typing your notes here..."
-                value={blocks[0]?.content || ""}
+                value={blocks[0]?.data.content || ""}
                 onChange={async (e) => {
                   if (blocks.length === 0) {
                     const block = await addTextBlock(page.id, 0, 0);

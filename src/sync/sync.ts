@@ -7,7 +7,7 @@ const TABLE_MAPPING: Record<string, string> = {
   folders: "folders",
   notebooks: "notebooks",
   pages: "pages",
-  blocks: "blocks",
+  // blocks: "blocks", // Removed in v4
   strokes: "strokes",
   canvasElements: "canvas_elements",
   appState: "app_state",
@@ -81,7 +81,7 @@ class SyncService {
       if (type === "DELETE") {
         await supabase.from(supabaseTableName).delete().match({ id: data.id });
       } else {
-        const mappedData = await this.mapToSupabase(dexieTableName, { ...data, user_id: this.userId });
+        const mappedData = await this.mapToSupabase(dexieTableName, { ...data, userId: this.userId });
         // Upsert is safer
         const { error } = await supabase.from(supabaseTableName).upsert(mappedData);
         if (error) throw error;
@@ -103,9 +103,9 @@ class SyncService {
   private async mapToSupabase(dexieTableName: string, data: any) {
     const common = {
       id: data.id,
-      user_id: data.user_id,
-      created_at: data.createdAt,
-      updated_at: data.updatedAt,
+      user_id: data.userId || this.userId, // Use provided userId or fallback to session
+      created_at: data.createdAt ? new Date(data.createdAt).toISOString() : undefined,
+      updated_at: data.updatedAt ? new Date(data.updatedAt).toISOString() : undefined,
     };
 
     // Remove undefined values
@@ -121,17 +121,25 @@ class SyncService {
         return clean({ ...common, folder_id: data.folderId, name: data.name });
       case "pages":
         return clean({ ...common, notebook_id: data.notebookId, title: data.title, type: data.type, settings: data.settings });
-      case "blocks":
-        // Handle Blob to Base64 conversion
-        let content = data.content;
-        if (data.blob && data.blob instanceof Blob) {
+      case "strokes":
+        return clean({
+          ...common,
+          page_id: data.pageId,
+          points: data.points, // Note: Should be binary/bytea if possible, but keeping as is for now if compatible
+          color: data.color,
+          width: data.width,
+        });
+      case "canvasElements":
+        // Handle Blob in data field for images
+        let elementData = { ...data.data };
+        if (elementData.blob && elementData.blob instanceof Blob) {
             try {
-                content = await this.blobToBase64(data.blob);
+                const base64 = await this.blobToBase64(elementData.blob);
+                elementData.url = base64; // Use url field for storage
+                delete elementData.blob; // Don't sync blob
             } catch (e) {
                 console.error("Failed to convert blob to base64 for sync", e);
             }
-        } else if (content === "blob" && !data.blob) {
-            // If content is "blob" but no blob object, we can't sync content properly.
         }
 
         return clean({
@@ -142,39 +150,16 @@ class SyncService {
           y: data.y,
           width: data.width,
           height: data.height,
-          content: content,
-          // blob field is excluded from Supabase payload
-        });
-      case "strokes":
-        return clean({
-          ...common,
-          page_id: data.pageId,
-          points: data.points,
-          color: data.color,
-          width: data.width,
-          pressures: data.pressures,
-          shape_type: data.shapeType,
-          original_points: data.originalPoints,
-        });
-      case "canvasElements":
-        return clean({
-          ...common,
-          page_id: data.pageId,
-          type: data.type,
-          x: data.x,
-          y: data.y,
-          width: data.width,
-          height: data.height,
           rotation: data.rotation,
-          opacity: data.opacity,
-          content: data.content,
+          z_index: data.zIndex,
+          data: elementData,
         });
       case "appState":
         return clean({
           key: data.key,
-          user_id: data.user_id,
+          user_id: common.user_id,
           value: data.value,
-          updated_at: data.updatedAt,
+          updated_at: common.updated_at,
         });
       default:
         return data;
@@ -185,8 +170,9 @@ class SyncService {
     // Basic mapping
     const common = {
       id: data.id,
-      createdAt: data.created_at ? Number(data.created_at) : undefined,
-      updatedAt: data.updated_at ? Number(data.updated_at) : undefined,
+      userId: data.user_id,
+      createdAt: data.created_at ? new Date(data.created_at).getTime() : undefined,
+      updatedAt: data.updated_at ? new Date(data.updated_at).getTime() : undefined,
     };
 
     switch (dexieTableName) {
@@ -196,17 +182,6 @@ class SyncService {
         return { ...common, folderId: data.folder_id, name: data.name };
       case "pages":
         return { ...common, notebookId: data.notebook_id, title: data.title, type: data.type, settings: data.settings };
-      case "blocks":
-        return {
-          ...common,
-          pageId: data.page_id,
-          type: data.type,
-          x: data.x,
-          y: data.y,
-          width: data.width,
-          height: data.height,
-          content: data.content,
-        };
       case "strokes":
         return {
           ...common,
@@ -214,9 +189,6 @@ class SyncService {
           points: data.points,
           color: data.color,
           width: data.width,
-          pressures: data.pressures,
-          shapeType: data.shape_type,
-          originalPoints: data.original_points,
         };
       case "canvasElements":
         return {
@@ -228,14 +200,14 @@ class SyncService {
           width: data.width,
           height: data.height,
           rotation: data.rotation,
-          opacity: data.opacity,
-          content: data.content,
+          zIndex: data.z_index,
+          data: data.data,
         };
       case "appState":
         return {
           key: data.key,
           value: data.value,
-          updatedAt: data.updated_at ? Number(data.updated_at) : undefined,
+          updatedAt: common.updatedAt,
         };
       default:
         return data;
@@ -260,11 +232,11 @@ class SyncService {
         const supabaseTableName = TABLE_MAPPING[dexieTableName];
         
         // Chunking with smaller batches for heavy tables
-        const chunkSize = (dexieTableName === 'strokes' || dexieTableName === 'blocks') ? 20 : 50;
+        const chunkSize = (dexieTableName === 'strokes' || dexieTableName === 'canvasElements') ? 20 : 50;
         
         for (let i = 0; i < allItems.length; i += chunkSize) {
             const chunk = allItems.slice(i, i + chunkSize);
-            const mappedItems = await Promise.all(chunk.map(item => this.mapToSupabase(dexieTableName, { ...item, user_id: this.userId })));
+            const mappedItems = await Promise.all(chunk.map(item => this.mapToSupabase(dexieTableName, { ...item, userId: this.userId })));
             
             const { error } = await supabase.from(supabaseTableName).upsert(mappedItems);
             if (error) console.error(`Failed to push chunk to ${supabaseTableName}:`, error);

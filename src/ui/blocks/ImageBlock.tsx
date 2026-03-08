@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Image as KonvaImage, Transformer } from "react-konva";
 import Konva from "konva";
 import { useBlockStore } from "@/stores/useBlockStore";
-import type { Block } from "@/data/models/block";
+import type { CanvasElement } from "@/data/models/canvas";
 
 export function ImageBlock({ 
   block, 
@@ -10,7 +10,7 @@ export function ImageBlock({
   onSelect,
   listening = true
 }: { 
-  block: Block; 
+  block: CanvasElement; 
   isSelected: boolean; 
   onSelect: () => void;
   listening?: boolean;
@@ -22,13 +22,15 @@ export function ImageBlock({
   const updateBlockPosition = useBlockStore((s) => s.updateBlockPosition);
 
   useEffect(() => {
-    let url = block.content;
+    let url = block.data.url || "";
     let isBlobUrl = false;
 
-    if (block.blob) {
-        url = URL.createObjectURL(block.blob);
+    if (block.data.blob) {
+        url = URL.createObjectURL(block.data.blob);
         isBlobUrl = true;
     }
+
+    if (!url) return;
 
     const img = new window.Image();
     img.src = url;
@@ -39,7 +41,7 @@ export function ImageBlock({
             URL.revokeObjectURL(url);
         }
     };
-  }, [block.content, block.blob]);
+  }, [block.data.url, block.data.blob]);
 
   useEffect(() => {
     if (isSelected && trRef.current && imageRef.current) {
