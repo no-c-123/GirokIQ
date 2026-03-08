@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef, type ElementType } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -8,22 +9,19 @@ import {
   Maximize2, 
   Minimize2, 
   Type, 
-  PenTool, 
-  Eraser, 
-  Image as ImageIcon, 
   Sidebar as SidebarIcon,
-  MousePointer2
 } from "lucide-react";
-import { cn } from "../utils";
-import CanvasArea from "./CanvasArea";
-import { useAppStore } from "../store/useAppStore";
-import { useUIStore } from "../stores/useUIStore";
-import { ColorPicker } from "../ui/components/ColorPicker";
-import { useBlockStore } from "../stores/useBlockStore";
-import { TextBlock } from "../ui/blocks/TextBlock";
-import { useHistoryStore } from "../history/useHistoryStore";
-import type { Page } from "../data/models/page";
-import type { Notebook } from "../data/models/notebook";
+import { cn } from "@/utils";
+import CanvasArea from "@/editor/CanvasArea";
+import { useAppStore } from "@/store/useAppStore";
+import { useUIStore } from "@/stores/useUIStore";
+import { useBlockStore } from "@/stores/useBlockStore";
+import { TextBlock } from "@/ui/blocks/TextBlock";
+import { useHistoryStore } from "@/history/useHistoryStore";
+import type { Page } from "@/data/models/page";
+import type { Notebook } from "@/data/models/notebook";
+import { Toolbar } from "@/ui/toolbar/Toolbar";
+import { PropertiesPanel } from "@/ui/properties/PropertiesPanel";
 
 interface EditorProps {
   page?: Page;
@@ -34,23 +32,12 @@ export function Editor({ page, notebook }: EditorProps) {
   const [title, setTitle] = useState(page?.title || "");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
-  const [showColorPicker, setShowColorPicker] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const pageId = page?.id;
 
   const sidebarVisible = useAppStore((s) => s.sidebarVisible);
   const setSidebarVisible = useAppStore((s) => s.setSidebarVisible);
 
-  const tool = useUIStore((s) => s.tool);
-  const setTool = useUIStore((s) => s.setTool);
-  const color = useUIStore((s) => s.color);
-  const strokeWidth = useUIStore((s) => s.strokeWidth);
-  const setStrokeWidth = useUIStore((s) => s.setStrokeWidth);
-  const presets = useUIStore((s) => s.presets);
-  const recentColors = useUIStore((s) => s.recentColors);
-  const setColor = useUIStore((s) => s.setColor);
-  
   const blocks = useBlockStore((s) => s.blocks);
   const hydrateBlocksForPage = useBlockStore((s) => s.hydrateBlocksForPage);
   const addTextBlock = useBlockStore((s) => s.addTextBlock);
@@ -59,45 +46,27 @@ export function Editor({ page, notebook }: EditorProps) {
   const selectedBlockId = useBlockStore((s) => s.selectedBlockId);
   const deleteBlock = useBlockStore((s) => s.deleteBlock);
   const deletePage = useAppStore((s) => s.deletePage);
+  const renamePage = useAppStore((s) => s.renamePage);
   const toggleStar = useAppStore((s) => s.toggleStar);
   const historyPush = useHistoryStore((s) => s.push);
   const undo = useHistoryStore((s) => s.undo);
   const redo = useHistoryStore((s) => s.redo);
   const historyClear = useHistoryStore((s) => s.clear);
 
+  useEffect(() => {
+    if (page?.title) {
+      setTitle(page.title);
+    }
+  }, [page?.title]);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !pageId) return;
+  const handleTitleChange = (newTitle: string) => {
+    setTitle(newTitle);
+  };
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result;
-      if (typeof result === "string") {
-        const img = new window.Image();
-        img.src = result;
-        img.onload = async () => {
-           // Calculate reasonable initial size
-           let width = img.width;
-           let height = img.height;
-           const maxSize = 500;
-           if (width > maxSize || height > maxSize) {
-             const ratio = Math.min(maxSize / width, maxSize / height);
-             width *= ratio;
-             height *= ratio;
-           }
-           
-           // Center on screen? We don't have view info here easily unless we pull it from CanvasPage or store.
-           // For now, let's put it at 100, 100 or center if we can.
-           // Actually, we can just put it at a default location.
-           await addImageBlock(pageId, 100, 100, result, width, height);
-        };
-      }
-    };
-    reader.readAsDataURL(file);
-    
-    // Reset input
-    if (fileInputRef.current) fileInputRef.current.value = "";
+  const handleTitleBlur = () => {
+    if (page && title !== page.title) {
+        void renamePage(page.id, title);
+    }
   };
 
   useEffect(() => {
@@ -121,17 +90,6 @@ export function Editor({ page, notebook }: EditorProps) {
         return;
       }
 
-      if (e.key >= "1" && e.key <= "9") {
-        const index = Number(e.key) - 1;
-        const next = presets[index];
-        if (next) setColor(next);
-      }
-      if (e.key.toLowerCase() === "c") {
-        setShowColorPicker(true);
-      }
-      if (e.key === "Escape") {
-        setShowColorPicker(false);
-      }
       if ((e.key === "Backspace" || e.key === "Delete") && selectedBlockId) {
         e.preventDefault();
         const block = useBlockStore
@@ -145,8 +103,6 @@ export function Editor({ page, notebook }: EditorProps) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [
-    presets,
-    setColor,
     selectedBlockId,
     deleteBlock,
     historyPush,
@@ -166,11 +122,6 @@ export function Editor({ page, notebook }: EditorProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showMenu]);
 
-  // Handle file input change
-  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    handleImageUpload(e);
-  };
-
   useEffect(() => {
     if (!page) {
       loadBlocksForPage("", []);
@@ -186,9 +137,9 @@ export function Editor({ page, notebook }: EditorProps) {
 
   if (!page) {
     return (
-      <div className="flex-1 h-full flex items-center justify-center text-zinc-600">
+      <div className="flex-1 h-full flex items-center justify-center text-[var(--text-secondary)]">
         <div className="text-center">
-          <div className="w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/5">
+          <div className="w-16 h-16 bg-[var(--bg-panel)] rounded-full flex items-center justify-center mx-auto mb-4 border border-[var(--border-subtle)]">
             <Type className="w-8 h-8 opacity-20" />
           </div>
           <p>Select a page to start writing</p>
@@ -198,27 +149,31 @@ export function Editor({ page, notebook }: EditorProps) {
   }
 
   return (
-    <div className="flex-1 h-full flex flex-col relative overflow-hidden bg-zinc-950">
+    <div className="flex-1 h-full flex flex-col relative overflow-hidden bg-[var(--bg-canvas)] transition-colors duration-300">
       {/* Top Bar */}
-      <header className="h-14 flex items-center justify-between px-6 border-b border-white/5 bg-zinc-900/10 backdrop-blur-sm z-10">
-        <div className="flex items-center gap-4">
+      <header className="layout-header h-14 flex items-center justify-between px-6 backdrop-blur-sm z-10 transition-colors duration-300 border-b border-[var(--border-subtle)]">
+        <div className="flex items-center gap-4 w-1/4">
           <ToolbarButton 
             icon={SidebarIcon} 
             onClick={() => setSidebarVisible(!sidebarVisible)}
             tooltip="Toggle Sidebar (Cmd+S)"
             active={sidebarVisible}
           />
-          <div className="flex items-center gap-2 text-sm text-zinc-500">
-            <span className="hover:text-zinc-300 cursor-pointer transition-colors">
+          <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)] overflow-hidden">
+            <span className="hover:text-[var(--text-primary)] cursor-pointer transition-colors truncate">
               {notebook?.name || "Notebook"}
             </span>
-            <span className="text-zinc-700">/</span>
-            <span className="text-zinc-300 font-medium">{title}</span>
+            <span className="text-[var(--text-tertiary)]">/</span>
+            <span className="text-[var(--text-primary)] font-medium truncate">{title}</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
-          <span className="text-xs text-zinc-600 mr-4">Last edited just now</span>
+        {/* Center Toolbar */}
+        <div className="flex-1 flex justify-center">
+            {page.type === "canvas" && <Toolbar />}
+        </div>
+
+        <div className="flex items-center justify-end gap-1 w-1/4">
           <ToolbarButton 
             icon={Clock} 
             tooltip="History" 
@@ -238,7 +193,7 @@ export function Editor({ page, notebook }: EditorProps) {
               alert("Link copied to clipboard!");
             }}
           />
-          <div className="w-px h-4 bg-white/10 mx-2" />
+          <div className="w-px h-4 bg-[var(--border-subtle)] mx-2" />
           <ToolbarButton 
             icon={isFullscreen ? Minimize2 : Maximize2} 
             onClick={() => setIsFullscreen(!isFullscreen)}
@@ -258,8 +213,8 @@ export function Editor({ page, notebook }: EditorProps) {
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95, y: 5 }}
                   transition={{ duration: 0.1 }}
-                  className="absolute right-0 top-full mt-2 w-48 bg-zinc-900 border border-white/10 rounded-lg shadow-xl overflow-hidden z-50"
-                  style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}
+                  className="absolute right-0 top-full mt-2 w-48 bg-[var(--bg-panel)] border border-[var(--border-subtle)] rounded-lg shadow-xl overflow-hidden z-50"
+                  style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
                 >
                   <div className="p-1">
                     <button 
@@ -267,7 +222,7 @@ export function Editor({ page, notebook }: EditorProps) {
                         window.print();
                         setShowMenu(false);
                       }}
-                      className="flex items-center w-full px-3 py-2 text-sm text-zinc-400 hover:text-zinc-100 hover:bg-white/5 rounded transition-colors text-left"
+                      className="flex items-center w-full px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-canvas)] rounded transition-colors text-left"
                     >
                       <span className="flex-1">Export PDF</span>
                     </button>
@@ -277,11 +232,11 @@ export function Editor({ page, notebook }: EditorProps) {
                         setShowMenu(false);
                         alert("Link copied to clipboard!");
                       }}
-                      className="flex items-center w-full px-3 py-2 text-sm text-zinc-400 hover:text-zinc-100 hover:bg-white/5 rounded transition-colors text-left"
+                      className="flex items-center w-full px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-canvas)] rounded transition-colors text-left"
                     >
                       <span className="flex-1">Copy Link</span>
                     </button>
-                    <div className="h-px bg-white/5 my-1" />
+                    <div className="h-px bg-[var(--border-subtle)] my-1" />
                     <button 
                       onClick={() => {
                         if (confirm("Are you sure you want to delete this page?")) {
@@ -289,7 +244,7 @@ export function Editor({ page, notebook }: EditorProps) {
                         }
                         setShowMenu(false);
                       }}
-                      className="flex items-center w-full px-3 py-2 text-sm text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded transition-colors text-left"
+                      className="flex items-center w-full px-3 py-2 text-sm text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 rounded transition-colors text-left"
                     >
                       <span className="flex-1">Delete Page</span>
                     </button>
@@ -302,117 +257,13 @@ export function Editor({ page, notebook }: EditorProps) {
       </header>
 
       {/* Main Canvas Area */}
-      <div className="flex-1 relative overflow-hidden bg-zinc-950">
-        {/* Floating Toolbar (Mockup) */}
+      <div className="flex-1 relative overflow-hidden bg-[var(--bg-canvas)]">
+        
+        {/* Properties Panel */}
         {page.type === "canvas" && (
-          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-zinc-900/90 backdrop-blur-md border border-white/10 rounded-full px-4 py-2 flex items-center gap-4 shadow-xl shadow-black/50 hover:shadow-indigo-500/20 z-20 transition-all hover:scale-105 hover:-translate-y-1">
-            <ToolButton
-              icon={MousePointer2}
-              active={tool === "lasso"}
-              onClick={() => setTool("lasso")}
-            />
-            <ToolButton
-              icon={PenTool}
-              active={tool === "pen"}
-              onClick={() => setTool("pen")}
-            />
-            <ToolButton
-              icon={Eraser}
-              active={tool === "eraser"}
-              onClick={() => setTool("eraser")}
-            />
-            <ToolButton
-              icon={Type}
-              active={tool === "text"}
-              onClick={() => setTool("text")}
-            />
-            <ToolButton 
-                icon={ImageIcon} 
-                onClick={() => fileInputRef.current?.click()}
-            />
-            <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                accept="image/*"
-                onChange={onFileChange}
-            />
-            <div className="w-px h-4 bg-white/10" />
-            
-            {/* Stroke Width Control */}
-            <div className="flex items-center gap-3 px-2 group/width">
-              <div className="flex items-center gap-1.5">
-                {[1, 4, 10].map((w) => (
-                  <button
-                    key={w}
-                    onClick={() => setStrokeWidth(w)}
-                    className={cn(
-                      "w-6 h-6 rounded flex items-center justify-center transition-all hover:bg-white/10",
-                      strokeWidth === w ? "text-indigo-400 bg-white/5" : "text-zinc-500"
-                    )}
-                  >
-                    <div 
-                      className="bg-current rounded-full" 
-                      style={{ width: Math.max(2, w/2), height: Math.max(2, w/2) }} 
-                    />
-                  </button>
-                ))}
-              </div>
-              <input
-                type="range"
-                min="0.5"
-                max="20"
-                step="0.5"
-                value={strokeWidth}
-                onChange={(e) => setStrokeWidth(parseFloat(e.target.value))}
-                className="w-20 accent-indigo-500 h-1 bg-white/10 rounded-full appearance-none cursor-pointer"
-              />
-              <span className="text-[10px] text-zinc-500 tabular-nums w-6">{strokeWidth}px</span>
+            <div className="absolute top-4 left-4 z-20">
+                <PropertiesPanel />
             </div>
-
-            <div className="w-px h-4 bg-white/10" />
-            <div className="flex items-center gap-2">
-              {presets.slice(0, 9).map((preset) => (
-                <ColorButton
-                  key={preset}
-                  color={preset}
-                  active={preset === color}
-                  onClick={() => setColor(preset)}
-                />
-              ))}
-              <button
-                onClick={() => setShowColorPicker(true)}
-                className={cn(
-                  "w-5 h-5 rounded-full border border-white/10 transition-all",
-                  color === "#000000" && "border-white/20",
-                )}
-                style={{
-                  background:
-                    "conic-gradient(from 180deg, #f472b6, #a78bfa, #60a5fa, #34d399, #fbbf24, #f97316, #fb7185, #f472b6)",
-                  boxShadow:
-                    showColorPicker || (!presets.includes(color) && recentColors.includes(color))
-                      ? "0 0 0 2px rgba(167,139,250,0.35), 0 0 18px rgba(167,139,250,0.25)"
-                      : undefined,
-                }}
-                aria-label="Open color picker"
-                title="Color picker (C)"
-              />
-            </div>
-          </div>
-        )}
-
-        {page.type === "canvas" && (
-          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-30">
-            <ColorPicker
-              key={color}
-              open={showColorPicker}
-              color={color}
-              presets={presets}
-              recentColors={recentColors}
-              onChange={(next) => setColor(next)}
-              onClose={() => setShowColorPicker(false)}
-            />
-          </div>
         )}
 
         <div className="absolute inset-0">
@@ -449,17 +300,6 @@ export function Editor({ page, notebook }: EditorProps) {
             </CanvasArea>
           )}
         </div>
-
-        {/* Title Overlay */}
-        <div className="absolute top-6 left-6 right-6 pointer-events-none z-5 w-1/2">
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Untitled"
-            className="w-full bg-transparent text-3xl font-bold text-zinc-100/20 hover:text-zinc-100/60 focus:text-zinc-100 focus:placeholder:text-zinc-600 placeholder:text-zinc-800 border-none outline-none transition-all pointer-events-auto"
-          />
-        </div>
       </div>
     </div>
   );
@@ -482,59 +322,12 @@ function ToolbarButton({
       className={cn(
         "p-2 rounded-md transition-colors",
         active 
-          ? "text-indigo-400 bg-indigo-500/10" 
-          : "text-zinc-500 hover:text-zinc-200 hover:bg-white/5"
+          ? "text-[var(--accent-primary)] bg-[var(--accent-subtle)]/20" 
+          : "text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-panel)]"
       )}
       title={tooltip}
     >
       <Icon className="w-4 h-4" />
     </button>
-  );
-}
-
-function ToolButton({
-  icon: Icon,
-  active,
-  onClick,
-}: {
-  icon: ElementType<{ className?: string }>;
-  active?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <button 
-      onClick={onClick}
-      className={cn(
-        "p-2 rounded-lg transition-all",
-        active ? "text-indigo-400 bg-indigo-500/10" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
-      )}
-    >
-      <Icon className="w-5 h-5" />
-    </button>
-  );
-}
-
-function ColorButton({
-  color,
-  active,
-  onClick,
-}: {
-  color: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="w-5 h-5 rounded-full border border-white/10 transition-all hover:scale-110"
-      style={{
-        backgroundColor: color,
-        boxShadow: active
-          ? "0 0 0 2px rgba(167,139,250,0.35), 0 0 18px rgba(167,139,250,0.25)"
-          : undefined,
-      }}
-      aria-label={`Select ${color}`}
-      title={color}
-    />
   );
 }

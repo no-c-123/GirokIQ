@@ -27,8 +27,13 @@ export interface StrokeElement extends BaseElement {
   color: string;
   width: number;
   pressures?: number[];
-  shapeType?: string;
+  shapeType?: string; // "rectangle" | "circle" | "diamond" | "arrow" | "line" | "ellipse"
   originalPoints?: number[];
+  strokeStyle?: "solid" | "dashed" | "dotted";
+  backgroundColor?: string;
+  opacity?: number;
+  edges?: "sharp" | "round";
+  sloppiness?: number;
 }
 
 export interface TextElement extends BaseElement {

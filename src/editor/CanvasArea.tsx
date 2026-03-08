@@ -3,23 +3,23 @@ import { Stage } from "react-konva";
 import type { KonvaEventObject } from "konva/lib/Node";
 import { Minus, Plus } from "lucide-react";
 import { nanoid } from "nanoid";
-import { useShapeSnapping } from "../hooks/useShapeSnapping";
-import type { RecognizedShape } from "../core/ShapeRecognizer";
-import { isStrokeInPolygon, isRectInPolygon } from "../selection/selectionGeometry";
-import { useCanvasStore } from "../stores/useCanvasStore";
-import { useUIStore } from "../stores/useUIStore";
-import { useBlockStore } from "../stores/useBlockStore";
-import { useHistoryStore } from "../history/useHistoryStore";
-import { useAppStore } from "../store/useAppStore";
-import { DrawingLayer } from "../core/layers/DrawingLayer";
-import { GridLayer } from "../core/layers/GridLayer";
-import { ImageLayer } from "../core/layers/ImageLayer";
-import { useImagePaste } from "../hooks/useImagePaste";
-import { ImageSelectionOverlay } from "../ui/overlays/ImageSelectionOverlay";
-import { LassoActionsOverlay } from "../ui/overlays/LassoActionsOverlay";
-import { LassoLayer } from "../core/layers/LassoLayer";
+import { useShapeSnapping } from "@/hooks/useShapeSnapping";
+import type { RecognizedShape } from "@/core/ShapeRecognizer";
+import { isStrokeInPolygon, isRectInPolygon } from "@/selection/selectionGeometry";
+import { useCanvasStore } from "@/stores/useCanvasStore";
+import { useUIStore } from "@/stores/useUIStore";
+import { useBlockStore } from "@/stores/useBlockStore";
+import { useHistoryStore } from "@/history/useHistoryStore";
+import { useAppStore } from "@/store/useAppStore";
+import { DrawingLayer } from "@/core/layers/DrawingLayer";
+import { GridLayer } from "@/core/layers/GridLayer";
+import { ImageLayer } from "@/core/layers/ImageLayer";
+import { useImagePaste } from "@/hooks/useImagePaste";
+import { ImageSelectionOverlay } from "@/ui/overlays/ImageSelectionOverlay";
+import { LassoActionsOverlay } from "@/ui/overlays/LassoActionsOverlay";
+import { LassoLayer } from "@/core/layers/LassoLayer";
 import Konva from "konva";
-import type { StrokeElement } from "../elements/types";
+import type { StrokeElement } from "@/elements/types";
 
 const ZOOM_MIN = 0.1;
 const ZOOM_MAX = 10;
@@ -43,17 +43,48 @@ export default function CanvasArea({
   const addElement = useCanvasStore((s) => s.addElement);
   const removeElement = useCanvasStore((s) => s.removeElement);
   const updateElement = useCanvasStore((s) => s.updateElement);
+  const loadStrokesForPage = useCanvasStore((s) => s.loadStrokesForPage);
 
   const strokes = useMemo(() => elements.filter((e): e is StrokeElement => e.type === 'stroke'), [elements]);
 
   const tool = useUIStore((s) => s.tool);
   const strokeWidth = useUIStore((s) => s.strokeWidth);
   const color = useUIStore((s) => s.color);
+  const strokeStyle = useUIStore((s) => s.strokeStyle);
+  const sloppiness = useUIStore((s) => s.sloppiness);
+  const edges = useUIStore((s) => s.edges);
+  const opacity = useUIStore((s) => s.opacity);
+  const shapeBackgroundColor = useUIStore((s) => s.backgroundColor);
+
+  const isToolLocked = useUIStore((s) => s.isToolLocked);
+  const setTool = useUIStore((s) => s.setTool);
+
+  const settings = useAppStore((s) => s.settings);
+  // Theme aware colors - we need to listen to theme changes
+  const [isDark, setIsDark] = useState(true);
+  
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    
+    // Initial check
+    checkTheme();
+    
+    // Observer for class changes on html element
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    
+    return () => observer.disconnect();
+  }, []);
+
+  const gridColor = isDark ? "#3f3f46" : "#d4d4d8"; // Dark: zinc-700, Light: zinc-300
+  const backgroundColor = isDark ? "#09090b" : "#ffffff"; // Dark: zinc-950, Light: white
+  const gridOpacity = isDark ? 0.3 : 0.4;
   
   // TODO: Migrate these to proper stores
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const selectionFilter = { images: true, text: true, strokes: true }; 
-  const hydrateStrokesForPage = async (_pageId: string) => { /* TODO: Implement in data layer */ };
   
   const updateStrokes = async (updates: { id: string; points: number[] }[]) => {
       updates.forEach(u => updateElement(u.id, { points: u.points }));
@@ -223,8 +254,8 @@ export default function CanvasArea({
 
   useEffect(() => {
     if (!activePageId) return;
-    void hydrateStrokesForPage(activePageId);
-  }, [activePageId, hydrateStrokesForPage]);
+    void loadStrokesForPage(activePageId);
+  }, [activePageId, loadStrokesForPage]);
 
   useEffect(() => {
     const isEditableTarget = (target: EventTarget | null) => {
@@ -348,7 +379,7 @@ export default function CanvasArea({
         
         // Restore cursor
         if (viewportRef.current) {
-          if (tool === "pen" || tool === "eraser" || tool === "lasso") {
+          if (["pen", "eraser", "lasso", "rectangle", "diamond", "ellipse", "arrow", "line"].includes(tool)) {
             viewportRef.current.style.cursor = "crosshair";
           } else if (tool === "text") {
             viewportRef.current.style.cursor = "text";
@@ -371,7 +402,7 @@ export default function CanvasArea({
     const viewport = viewportRef.current;
     if (!viewport) return;
 
-    if (tool === "pen" || tool === "eraser" || tool === "lasso") {
+    if (["pen", "eraser", "lasso", "rectangle", "diamond", "ellipse", "arrow", "line"].includes(tool)) {
       viewport.style.cursor = "crosshair";
     } else if (tool === "text") {
       viewport.style.cursor = "text";
@@ -437,8 +468,8 @@ export default function CanvasArea({
     e.evt.preventDefault();
     if (isGestureRef.current) return;
 
-    // Check for space key or middle mouse button (button 1)
-    if (isSpacePressedRef.current || e.evt.button === 1) {
+    // Check for space key or middle mouse button (button 1) or hand tool
+    if (isSpacePressedRef.current || e.evt.button === 1 || tool === "hand") {
       isPanningRef.current = true;
       lastPanPositionRef.current = { x: e.evt.clientX, y: e.evt.clientY };
       if (viewportRef.current) viewportRef.current.style.cursor = "grabbing";
@@ -493,7 +524,8 @@ export default function CanvasArea({
       return;
     }
 
-    if (tool !== "pen") return;
+    const isDrawingTool = ["pen", "rectangle", "diamond", "ellipse", "arrow", "line"].includes(tool);
+    if (!isDrawingTool) return;
 
     const pressure = 0.5; // Always neutral pressure
 
@@ -504,12 +536,37 @@ export default function CanvasArea({
       color,
       width: strokeWidth,
       pressures: [pressure],
+      shapeType: tool === "pen" ? undefined : tool,
+      strokeStyle,
+      backgroundColor: shapeBackgroundColor,
+      opacity,
+      edges,
+      sloppiness,
     };
     
     // Imperative update for smoothness
     setTempStroke(stroke);
     tempStrokeRef.current = stroke;
     tempPointsRef.current = [localPoint.x, localPoint.y];
+  };
+
+  const getShapePoints = (tool: string, startX: number, startY: number, endX: number, endY: number): number[] => {
+      if (tool === "line" || tool === "arrow") {
+          return [startX, startY, endX, endY];
+      }
+      if (tool === "rectangle") {
+          return [startX, startY, endX, startY, endX, endY, startX, endY, startX, startY];
+      }
+      if (tool === "diamond") {
+          const midX = (startX + endX) / 2;
+          const midY = (startY + endY) / 2;
+          return [midX, startY, endX, midY, midX, endY, startX, midY, midX, startY];
+      }
+      if (tool === "ellipse") {
+          // Store bounding box points
+          return [startX, startY, endX, endY];
+      }
+      return [startX, startY];
   };
 
   const handlePointerMove = (e: KonvaEventObject<PointerEvent>) => {
@@ -538,9 +595,27 @@ export default function CanvasArea({
       return;
     }
 
-    if (tool !== "pen" && tool !== "lasso") return;
-    if (tool === "pen" && !tempStrokeRef.current) return;
+    const isDrawingTool = ["pen", "rectangle", "diamond", "ellipse", "arrow", "line"].includes(tool);
+    if (!isDrawingTool && tool !== "lasso") return;
+    if (isDrawingTool && !tempStrokeRef.current) return;
     if (tool === "lasso" && !tempStrokeRef.current) return;
+
+    // Handle shapes (drag to create)
+    if (isDrawingTool && tool !== "pen") {
+        const startX = tempPointsRef.current[0];
+        const startY = tempPointsRef.current[1];
+        const newPoints = getShapePoints(tool, startX, startY, localPoint.x, localPoint.y);
+        
+        // Update temp stroke directly
+        setTempStroke((prev: any) => {
+            if (!prev) return null;
+            return {
+                ...prev,
+                points: newPoints
+            };
+        });
+        return;
+    }
 
     // Use coalesced events if available for smoother curves
     const rawEvents = (e.evt as any).getCoalescedEvents
@@ -606,7 +681,7 @@ export default function CanvasArea({
         viewportRef.current.style.cursor = isSpacePressedRef.current ? "grab" : "default";
         // If we reverted to default, check tool
         if (!isSpacePressedRef.current) {
-             if (tool === "pen" || tool === "eraser" || tool === "lasso") {
+             if (["pen", "eraser", "lasso", "rectangle", "diamond", "ellipse", "arrow", "line"].includes(tool)) {
                  viewportRef.current.style.cursor = "crosshair";
              } else if (tool === "text") {
                  viewportRef.current.style.cursor = "text";
@@ -678,7 +753,8 @@ export default function CanvasArea({
       const current = tempStrokeRef.current;
       
       let finalPoints = [...tempPointsRef.current];
-      let finalShapeType: string | undefined;
+      // Initialize with current shapeType to avoid losing it if not snapped
+      let finalShapeType: string | undefined = current.shapeType;
       let finalOriginalPoints: number[] | undefined;
 
       const snapped = snapHook.getSnappedShape();
@@ -706,13 +782,18 @@ export default function CanvasArea({
       setTempStroke(null);
       tempStrokeRef.current = null;
       tempPointsRef.current = [];
+
+      // Removed auto-switch to lasso to allow continuous placement
+      // if (!isToolLocked) {
+      //     setTool("lasso"); // Switch back to selection tool
+      // }
     }
     isPointerDownRef.current = false;
     isErasingRef.current = false;
   };
 
   return (
-    <div ref={containerRef} className="w-full h-full">
+    <div ref={containerRef} className="w-full h-full" style={{ backgroundColor }}>
       <div
         ref={viewportRef}
         className="relative w-full h-full overflow-hidden"
@@ -870,6 +951,9 @@ export default function CanvasArea({
             height={stageSize.height / stageScale} 
             minX={-view.position.x / stageScale}
             minY={-view.position.y / stageScale}
+            gridColor={gridColor}
+            backgroundColor={backgroundColor}
+            opacity={gridOpacity}
           />
           
           <ImageLayer />

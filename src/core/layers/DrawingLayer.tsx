@@ -1,8 +1,8 @@
 import { Layer, Group, Path } from "react-konva";
-import type { StrokeElement } from "../../elements/types";
+import type { StrokeElement } from "@/elements/types";
 import { useMemo, useRef, useEffect, memo } from "react";
 import Konva from "konva";
-import { QuadTree } from "../../spatial/QuadTree";
+import { QuadTree } from "@/spatial/QuadTree";
 
 const TILE_SIZE = 1024;
 
@@ -50,13 +50,58 @@ export function getSmoothSvgPath(points: number[]) {
 export function getPathData(stroke: StrokeElement) {
   if (stroke.shapeType) {
       if (stroke.points.length < 2) return "";
+      
+      if (stroke.shapeType === "ellipse") {
+          // Calculate bounding box from points
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+          for (let i = 0; i < stroke.points.length; i += 2) {
+              minX = Math.min(minX, stroke.points[i]);
+              minY = Math.min(minY, stroke.points[i+1]);
+              maxX = Math.max(maxX, stroke.points[i]);
+              maxY = Math.max(maxY, stroke.points[i+1]);
+          }
+          const width = maxX - minX;
+          const height = maxY - minY;
+          const cx = minX + width / 2;
+          const cy = minY + height / 2;
+          const rx = width / 2;
+          const ry = height / 2;
+
+          // Ellipse path command
+          // M cx-rx, cy
+          // A rx, ry 0 1, 0 cx+rx, cy
+          // A rx, ry 0 1, 0 cx-rx, cy
+          return `M ${cx - rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx + rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx - rx} ${cy} Z`;
+      }
+
       let d = `M ${stroke.points[0]} ${stroke.points[1]}`;
       for (let i = 2; i < stroke.points.length; i += 2) {
           d += ` L ${stroke.points[i]} ${stroke.points[i+1]}`;
       }
-      if (stroke.shapeType !== "line" && stroke.points.length > 4) {
+      
+      if (stroke.shapeType !== "line" && stroke.shapeType !== "arrow" && stroke.points.length > 4) {
           d += " Z";
       }
+
+      if (stroke.shapeType === "arrow" && stroke.points.length >= 4) {
+        // Add arrow head at the end
+        const endX = stroke.points[stroke.points.length - 2];
+        const endY = stroke.points[stroke.points.length - 1];
+        const prevX = stroke.points[stroke.points.length - 4];
+        const prevY = stroke.points[stroke.points.length - 3];
+        
+        const angle = Math.atan2(endY - prevY, endX - prevX);
+        const headLength = Math.max(10, stroke.width * 3);
+        const headAngle = Math.PI / 6; // 30 degrees
+
+        const x1 = endX - headLength * Math.cos(angle - headAngle);
+        const y1 = endY - headLength * Math.sin(angle - headAngle);
+        const x2 = endX - headLength * Math.cos(angle + headAngle);
+        const y2 = endY - headLength * Math.sin(angle + headAngle);
+
+        d += ` M ${endX} ${endY} L ${x1} ${y1} M ${endX} ${endY} L ${x2} ${y2}`;
+      }
+
       return d;
   }
   return getSmoothSvgPath(stroke.points);
@@ -180,6 +225,9 @@ export function DrawingLayer({
                     data={pathData}
                     stroke={stroke.color}
                     strokeWidth={stroke.width}
+                    dash={stroke.strokeStyle === "dashed" ? [10, 10] : stroke.strokeStyle === "dotted" ? [5, 5] : undefined}
+                    opacity={stroke.opacity ? stroke.opacity / 100 : 1}
+                    fill={stroke.backgroundColor && stroke.backgroundColor !== "transparent" ? stroke.backgroundColor : undefined}
                     lineCap="round"
                     lineJoin="round"
                     // Add a subtle shadow or effect to indicate selection if desired
@@ -222,6 +270,9 @@ export function DrawingLayer({
         data={pathData}
         stroke={currentStroke.color}
         strokeWidth={currentStroke.width}
+        dash={currentStroke.strokeStyle === "dashed" ? [10, 10] : currentStroke.strokeStyle === "dotted" ? [5, 5] : undefined}
+        opacity={currentStroke.opacity ? currentStroke.opacity / 100 : 1}
+        fill={currentStroke.backgroundColor && currentStroke.backgroundColor !== "transparent" ? currentStroke.backgroundColor : undefined}
         lineCap="round"
         lineJoin="round"
         perfectDrawEnabled={false}
@@ -252,6 +303,9 @@ const Tile = memo(function Tile({ x, y, strokes }: { x: number, y: number, strok
                 data={pathData}
                 stroke={stroke.color}
                 strokeWidth={stroke.width}
+                dash={stroke.strokeStyle === "dashed" ? [10, 10] : stroke.strokeStyle === "dotted" ? [5, 5] : undefined}
+                opacity={stroke.opacity ? stroke.opacity / 100 : 1}
+                fill={stroke.backgroundColor && stroke.backgroundColor !== "transparent" ? stroke.backgroundColor : undefined}
                 lineCap="round"
                 lineJoin="round"
                 perfectDrawEnabled={false}
