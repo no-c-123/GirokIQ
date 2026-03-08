@@ -140,7 +140,7 @@ export const useAppStore = create<AppState>((set) => ({
   deletePage: async (id) => {
     await db.pages.delete(id);
     await db.strokes.where("pageId").equals(id).delete();
-    await db.blocks.where("pageId").equals(id).delete();
+    await db.canvasElements.where("pageId").equals(id).delete();
 
     set((state) => {
       const newPages = state.pages.filter((p) => p.id !== id);
@@ -215,7 +215,7 @@ export const useAppStore = create<AppState>((set) => ({
     // 5. Delete strokes and blocks for these pages
     if (pageIds.length > 0) {
       await db.strokes.where("pageId").anyOf(pageIds).delete();
-      await db.blocks.where("pageId").anyOf(pageIds).delete();
+      await db.canvasElements.where("pageId").anyOf(pageIds).delete();
     }
 
     set((state) => {
@@ -258,7 +258,7 @@ export const useAppStore = create<AppState>((set) => ({
     // 4. Delete strokes and blocks for these pages
     if (pageIds.length > 0) {
       await db.strokes.where("pageId").anyOf(pageIds).delete();
-      await db.blocks.where("pageId").anyOf(pageIds).delete();
+      await db.canvasElements.where("pageId").anyOf(pageIds).delete();
     }
 
     set((state) => {

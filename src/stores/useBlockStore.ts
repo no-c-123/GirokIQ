@@ -2,7 +2,6 @@ import { create } from "zustand";
 import { nanoid } from "nanoid";
 import { db } from "@/db";
 import type { CanvasElement } from "@/data/models/canvas";
-import { useAppStore } from "@/store/useAppStore"; // To get userId if needed, or we can use placeholder
 
 interface BlockState {
   blocks: CanvasElement[];
