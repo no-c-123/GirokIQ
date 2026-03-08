@@ -4,7 +4,7 @@ import { useCanvasStore } from "@/stores/useCanvasStore";
 import { cn } from "@/utils";
 import { ColorPicker } from "@/ui/properties/ColorPicker";
 import { useState } from "react";
-import { Sliders, Maximize2, Minimize2 } from "lucide-react";
+import { Sliders } from "lucide-react";
 
 export function PropertiesPanel() {
   const strokeWidth = useUIStore((s) => s.strokeWidth);

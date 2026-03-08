@@ -13,7 +13,7 @@ import {
   Image as ImageIcon, 
   Eraser 
 } from "lucide-react";
-import { useUIStore, type ToolType } from "@/stores/useUIStore";
+import { useUIStore } from "@/stores/useUIStore";
 import { cn } from "@/utils";
 
 export function Toolbar() {

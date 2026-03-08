@@ -428,7 +428,7 @@ function NotebookItem({ notebook, pages, activePageId, onPageSelect, onDeletePag
   );
 }
 
-function PageItem({ page, isActive, onSelect, onDelete, onRename }: { 
+function PageItem({ page, isActive, onSelect, onDelete }: { 
   page: Page, 
   isActive: boolean, 
   onSelect: () => void,

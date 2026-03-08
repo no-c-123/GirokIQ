@@ -56,10 +56,6 @@ export default function CanvasArea({
   const opacity = useUIStore((s) => s.opacity);
   const shapeBackgroundColor = useUIStore((s) => s.backgroundColor);
 
-  const isToolLocked = useUIStore((s) => s.isToolLocked);
-  const setTool = useUIStore((s) => s.setTool);
-
-  const settings = useAppStore((s) => s.settings);
   // Theme aware colors - we need to listen to theme changes
   const [isDark, setIsDark] = useState(true);
   

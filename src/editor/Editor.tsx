@@ -14,7 +14,6 @@ import {
 import { cn } from "@/utils";
 import CanvasArea from "@/editor/CanvasArea";
 import { useAppStore } from "@/store/useAppStore";
-import { useUIStore } from "@/stores/useUIStore";
 import { useBlockStore } from "@/stores/useBlockStore";
 import { TextBlock } from "@/ui/blocks/TextBlock";
 import { useHistoryStore } from "@/history/useHistoryStore";
@@ -41,7 +40,6 @@ export function Editor({ page, notebook }: EditorProps) {
   const blocks = useBlockStore((s) => s.blocks);
   const hydrateBlocksForPage = useBlockStore((s) => s.hydrateBlocksForPage);
   const addTextBlock = useBlockStore((s) => s.addTextBlock);
-  const addImageBlock = useBlockStore((s) => s.addImageBlock);
   const loadBlocksForPage = useBlockStore((s) => s.loadBlocksForPage);
   const selectedBlockId = useBlockStore((s) => s.selectedBlockId);
   const deleteBlock = useBlockStore((s) => s.deleteBlock);
@@ -58,16 +56,6 @@ export function Editor({ page, notebook }: EditorProps) {
       setTitle(page.title);
     }
   }, [page?.title]);
-
-  const handleTitleChange = (newTitle: string) => {
-    setTitle(newTitle);
-  };
-
-  const handleTitleBlur = () => {
-    if (page && title !== page.title) {
-        void renamePage(page.id, title);
-    }
-  };
 
   useEffect(() => {
     const isEditableTarget = (target: EventTarget | null) => {
