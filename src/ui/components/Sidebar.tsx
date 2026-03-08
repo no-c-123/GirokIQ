@@ -260,7 +260,7 @@ function FolderItem({ folder, notebooks, pages, activePageId, onPageSelect, onDe
   onRenamePage: (id: string, name: string) => void
 }) {
   const [isOpen, setIsOpen] = useState(true);
-  const [isOverflowHidden, setIsOverflowHidden] = useState(true);
+  const [isOverflowHidden, setIsOverflowHidden] = useState(false);
 
   return (
     <div className="mb-1">
@@ -352,7 +352,7 @@ function NotebookItem({ notebook, pages, activePageId, onPageSelect, onDeletePag
   onRenamePage: (id: string, name: string) => void
 }) {
   const [isOpen, setIsOpen] = useState(true);
-  const [isOverflowHidden, setIsOverflowHidden] = useState(true);
+  const [isOverflowHidden, setIsOverflowHidden] = useState(false);
 
   return (
     <div className="mb-0.5">
