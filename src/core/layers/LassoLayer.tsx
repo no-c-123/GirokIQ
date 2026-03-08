@@ -1,8 +1,8 @@
 import { Layer, Rect, Transformer } from "react-konva";
-import { useBlockStore } from "../../stores/useBlockStore";
+import { useBlockStore } from "@/stores/useBlockStore";
 import { useRef, useEffect } from "react";
 import Konva from "konva";
-import type { StrokeElement } from "../../elements/types";
+import type { StrokeElement } from "@/elements/types";
 
 
 

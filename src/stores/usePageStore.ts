@@ -1,6 +1,6 @@
 
 import { create } from "zustand";
-import type { Page } from "../pages/types";
+import type { Page } from "@/pages/types";
 
 interface PageState {
   activePageId: string | null;

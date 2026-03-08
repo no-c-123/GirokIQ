@@ -5,10 +5,80 @@
   --font-sans: "Inter", system-ui, sans-serif;
 }
 
+:root {
+  /* Light Mode Palette */
+  --bg-app: #ffffff;
+  --bg-sidebar: #f4f4f5; /* zinc-100 */
+  --bg-canvas: #ffffff;
+  --bg-panel: #ffffff;
+  
+  --text-primary: #18181b; /* zinc-900 */
+  --text-secondary: #71717a; /* zinc-500 */
+  --text-tertiary: #a1a1aa; /* zinc-400 */
+  
+  --border-subtle: #e4e4e7; /* zinc-200 */
+  --border-strong: #d4d4d8; /* zinc-300 */
+  
+  --grid-color: #d4d4d8; /* zinc-300 - Higher contrast for light mode */
+  --grid-opacity: 0.4;
+  
+  --accent-primary: #6366f1; /* indigo-500 */
+  --accent-hover: #4f46e5; /* indigo-600 */
+  --accent-subtle: #e0e7ff; /* indigo-100 */
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+}
+
+.dark {
+  /* Dark Mode Palette */
+  --bg-app: #09090b; /* zinc-950 */
+  --bg-sidebar: #09090b; /* zinc-950 */
+  --bg-canvas: #09090b; /* zinc-950 */
+  --bg-panel: #18181b; /* zinc-900 */
+  
+  --text-primary: #f4f4f5; /* zinc-100 */
+  --text-secondary: #a1a1aa; /* zinc-400 */
+  --text-tertiary: #52525b; /* zinc-600 */
+  
+  --border-subtle: #27272a; /* zinc-800 */
+  --border-strong: #3f3f46; /* zinc-700 */
+  
+  --grid-color: #3f3f46; /* zinc-700 - Higher contrast for dark mode */
+  --grid-opacity: 0.3;
+  
+  --accent-primary: #818cf8; /* indigo-400 */
+  --accent-hover: #6366f1; /* indigo-500 */
+  --accent-subtle: #312e81; /* indigo-900 */
+}
+
 body {
   font-family: var(--font-sans);
-  background-color: #09090b; /* zinc-950 */
-  color: #e4e4e7; /* zinc-200 */
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Utility classes for layout */
+.layout-sidebar {
+  background-color: var(--bg-sidebar);
+  border-right: 1px solid var(--border-subtle);
+}
+
+.layout-header {
+  background-color: var(--bg-panel);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.interactive-hover {
+  transition: all 0.2s ease;
+}
+.interactive-hover:hover {
+  background-color: var(--bg-panel); /* simple hover effect */
+}
+.dark .interactive-hover:hover {
+  background-color: #27272a; /* zinc-800 */
 }
 
 @property --border-angle {

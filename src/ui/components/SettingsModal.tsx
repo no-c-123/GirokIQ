@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Palette, PenTool, Keyboard, Database, Search, Trash2 } from "lucide-react";
-import { useAppStore } from "../../store/useAppStore";
-import { useUIStore } from "../../stores/useUIStore";
-import { useKeyboardShortcuts } from "../../ui/hooks/useKeyboardShortcuts";
-import { cn } from "../../utils";
+import { useAppStore } from "@/store/useAppStore";
+import { useUIStore } from "@/stores/useUIStore";
+import { useKeyboardShortcuts } from "@/ui/hooks/useKeyboardShortcuts";
+import { cn } from "@/utils";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -28,6 +28,22 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     s.category.toLowerCase().includes(shortcutSearch.toLowerCase())
   );
 
+  const toggleTheme = (theme: "dark" | "light" | "system") => {
+    updateSettings({ theme });
+    // Apply theme immediately
+    if (theme === "system") {
+      if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+    } else if (theme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -44,13 +60,13 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-4xl h-150 bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl flex overflow-hidden z-10"
+            className="relative w-full max-w-4xl h-150 bg-[var(--bg-panel)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl flex overflow-hidden z-10"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Sidebar */}
-            <div className="w-64 border-r border-white/5 bg-zinc-950/30 p-4 flex flex-col gap-1">
+            <div className="w-64 border-r border-[var(--border-subtle)] bg-[var(--bg-sidebar)] p-4 flex flex-col gap-1">
               <div className="px-3 py-4 mb-2">
-                <h3 className="text-xl font-bold text-zinc-100">Settings</h3>
+                <h3 className="text-xl font-bold text-[var(--text-primary)]">Settings</h3>
               </div>
               <TabButton 
                 active={activeTab === "interface"} 
@@ -79,12 +95,12 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </div>
 
             {/* Content */}
-            <div className="flex-1 flex flex-col min-w-0">
-              <div className="p-6 border-b border-white/5 flex items-center justify-between">
-                <h4 className="text-lg font-medium text-zinc-200 capitalize">{activeTab}</h4>
+            <div className="flex-1 flex flex-col min-w-0 bg-[var(--bg-panel)]">
+              <div className="p-6 border-b border-[var(--border-subtle)] flex items-center justify-between">
+                <h4 className="text-lg font-medium text-[var(--text-primary)] capitalize">{activeTab}</h4>
                 <button 
                   onClick={onClose}
-                  className="p-2 text-zinc-500 hover:text-zinc-200 hover:bg-white/5 rounded-full transition-colors"
+                  className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-canvas)] rounded-full transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -94,21 +110,21 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 {activeTab === "interface" && (
                   <div className="space-y-8">
                     <section>
-                      <h5 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-4">Theme</h5>
+                      <h5 className="text-sm font-medium text-[var(--text-tertiary)] uppercase tracking-wider mb-4">Theme</h5>
                       <div className="grid grid-cols-3 gap-4">
                         <ThemeCard 
                           active={settings.theme === "dark"} 
-                          onClick={() => updateSettings({ theme: "dark" })}
+                          onClick={() => toggleTheme("dark")}
                           label="Dark"
                         />
                         <ThemeCard 
                           active={settings.theme === "light"} 
-                          onClick={() => updateSettings({ theme: "light" })}
+                          onClick={() => toggleTheme("light")}
                           label="Light"
                         />
                         <ThemeCard 
                           active={settings.theme === "system"} 
-                          onClick={() => updateSettings({ theme: "system" })}
+                          onClick={() => toggleTheme("system")}
                           label="System"
                         />
                       </div>
@@ -119,11 +135,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 {activeTab === "drawing" && (
                   <div className="space-y-8">
                     <section>
-                      <h5 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-4">Behaviors</h5>
-                      <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5">
+                      <h5 className="text-sm font-medium text-[var(--text-tertiary)] uppercase tracking-wider mb-4">Behaviors</h5>
+                      <div className="flex items-center justify-between p-4 bg-[var(--bg-canvas)] rounded-xl border border-[var(--border-subtle)] transition-colors">
                         <div>
-                          <div className="text-zinc-100 font-medium">Shape Recognition</div>
-                          <div className="text-sm text-zinc-500">Automatically convert sketches to geometric shapes</div>
+                          <div className="text-[var(--text-primary)] font-medium">Shape Recognition</div>
+                          <div className="text-sm text-[var(--text-secondary)]">Automatically convert sketches to geometric shapes</div>
                         </div>
                         <Switch 
                           checked={shapeRecognitionEnabled} 
@@ -133,32 +149,32 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     </section>
 
                     <section>
-                      <h5 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-4">Selection Filters</h5>
+                      <h5 className="text-sm font-medium text-[var(--text-tertiary)] uppercase tracking-wider mb-4">Selection Filters</h5>
                       <div className="space-y-2">
-                        <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5">
+                        <div className="flex items-center justify-between p-4 bg-[var(--bg-canvas)] rounded-xl border border-[var(--border-subtle)] transition-colors">
                           <div>
-                            <div className="text-zinc-100 font-medium">Select Images</div>
-                            <div className="text-sm text-zinc-500">Allow lasso tool to select images</div>
+                            <div className="text-[var(--text-primary)] font-medium">Select Images</div>
+                            <div className="text-sm text-[var(--text-secondary)]">Allow lasso tool to select images</div>
                           </div>
                           <Switch 
                             checked={selectionFilter.images} 
                             onChange={(v) => setSelectionFilter({ images: v })} 
                           />
                         </div>
-                        <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5">
+                        <div className="flex items-center justify-between p-4 bg-[var(--bg-canvas)] rounded-xl border border-[var(--border-subtle)] transition-colors">
                           <div>
-                            <div className="text-zinc-100 font-medium">Select Text</div>
-                            <div className="text-sm text-zinc-500">Allow lasso tool to select text blocks</div>
+                            <div className="text-[var(--text-primary)] font-medium">Select Text</div>
+                            <div className="text-sm text-[var(--text-secondary)]">Allow lasso tool to select text blocks</div>
                           </div>
                           <Switch 
                             checked={selectionFilter.text} 
                             onChange={(v) => setSelectionFilter({ text: v })} 
                           />
                         </div>
-                        <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5">
+                        <div className="flex items-center justify-between p-4 bg-[var(--bg-canvas)] rounded-xl border border-[var(--border-subtle)] transition-colors">
                           <div>
-                            <div className="text-zinc-100 font-medium">Select Strokes</div>
-                            <div className="text-sm text-zinc-500">Allow lasso tool to select handwriting</div>
+                            <div className="text-[var(--text-primary)] font-medium">Select Strokes</div>
+                            <div className="text-sm text-[var(--text-secondary)]">Allow lasso tool to select handwriting</div>
                           </div>
                           <Switch 
                             checked={selectionFilter.strokes} 
@@ -173,25 +189,25 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 {activeTab === "shortcuts" && (
                   <div className="space-y-6">
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-tertiary)]" />
                       <input 
                         type="text"
                         value={shortcutSearch}
                         onChange={(e) => setShortcutSearch(e.target.value)}
                         placeholder="Search shortcuts..."
-                        className="w-full bg-black/20 border border-white/5 rounded-xl py-2.5 pl-10 pr-4 text-sm text-zinc-100 focus:outline-none focus:border-indigo-500/30 transition-all"
+                        className="w-full bg-[var(--bg-canvas)] border border-[var(--border-subtle)] rounded-xl py-2.5 pl-10 pr-4 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]/30 transition-all placeholder:text-[var(--text-tertiary)]"
                       />
                     </div>
                     <div className="space-y-2">
                       {filteredShortcuts.map(s => (
-                        <div key={s.id} className="flex items-center justify-between p-3 hover:bg-white/5 rounded-lg transition-colors group">
+                        <div key={s.id} className="flex items-center justify-between p-3 hover:bg-[var(--bg-canvas)] rounded-lg transition-colors group">
                           <div>
-                            <div className="text-zinc-200 font-medium">{s.description}</div>
-                            <div className="text-[10px] text-zinc-500 uppercase tracking-widest">{s.category}</div>
+                            <div className="text-[var(--text-primary)] font-medium">{s.description}</div>
+                            <div className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-widest">{s.category}</div>
                           </div>
                           <div className="flex items-center gap-1.5">
                             {s.keys.map((key, i) => (
-                              <kbd key={i} className="px-1.5 py-0.5 bg-white/10 rounded text-[10px] font-mono text-zinc-300 min-w-6 text-center border border-white/5">
+                              <kbd key={i} className="px-1.5 py-0.5 bg-[var(--bg-panel)] rounded text-[10px] font-mono text-[var(--text-secondary)] min-w-6 text-center border border-[var(--border-subtle)]">
                                 {key === "meta" ? (navigator.platform.includes("Mac") ? "⌘" : "Ctrl") : key.toUpperCase()}
                               </kbd>
                             ))}
@@ -205,7 +221,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 {activeTab === "system" && (
                   <div className="space-y-8">
                     <section>
-                      <h5 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-4">Storage & Cache</h5>
+                      <h5 className="text-sm font-medium text-[var(--text-tertiary)] uppercase tracking-wider mb-4">Storage & Cache</h5>
                       <div className="space-y-3">
                         <button 
                           onClick={async () => {
@@ -236,7 +252,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                               });
                             }
                           }}
-                          className="w-full p-4 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-zinc-300 text-sm font-medium transition-colors text-left"
+                          className="w-full p-4 bg-[var(--bg-canvas)] hover:bg-[var(--bg-sidebar)] border border-[var(--border-subtle)] rounded-xl text-[var(--text-secondary)] text-sm font-medium transition-colors text-left"
                         >
                           Reset Preferences Only
                         </button>
@@ -260,8 +276,8 @@ function TabButton({ active, onClick, icon: Icon, label }: { active: boolean, on
       className={cn(
         "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
         active 
-          ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/20" 
-          : "text-zinc-500 hover:text-zinc-200 hover:bg-white/5"
+          ? "bg-[var(--accent-primary)] text-white shadow-lg shadow-[var(--accent-primary)]/20" 
+          : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-panel)]"
       )}
     >
       <Icon className="w-4 h-4" />
@@ -277,15 +293,15 @@ function ThemeCard({ active, onClick, label }: { active: boolean, onClick: () =>
       className={cn(
         "aspect-video rounded-xl border p-3 flex flex-col justify-between transition-all",
         active 
-          ? "border-indigo-500 bg-indigo-500/5 ring-1 ring-indigo-500" 
-          : "border-white/5 bg-black/20 hover:border-white/10"
+          ? "border-[var(--accent-primary)] bg-[var(--accent-primary)]/5 ring-1 ring-[var(--accent-primary)]" 
+          : "border-[var(--border-subtle)] bg-[var(--bg-canvas)] hover:border-[var(--border-strong)]"
       )}
     >
       <div className="flex gap-1.5">
-        <div className="w-2 h-2 rounded-full bg-zinc-700" />
-        <div className="w-8 h-2 rounded-full bg-zinc-700" />
+        <div className="w-2 h-2 rounded-full bg-[var(--text-tertiary)]" />
+        <div className="w-8 h-2 rounded-full bg-[var(--text-tertiary)]" />
       </div>
-      <div className="text-xs font-medium text-zinc-400">{label}</div>
+      <div className="text-xs font-medium text-[var(--text-secondary)]">{label}</div>
     </button>
   );
 }
@@ -296,7 +312,7 @@ function Switch({ checked, onChange }: { checked: boolean, onChange: (val: boole
       onClick={() => onChange(!checked)}
       className={cn(
         "w-11 h-6 rounded-full transition-colors relative",
-        checked ? "bg-indigo-500" : "bg-zinc-700"
+        checked ? "bg-[var(--accent-primary)]" : "bg-[var(--border-strong)]"
       )}
     >
       <div className={cn(

@@ -1,5 +1,5 @@
-import { db } from "../db";
-import { supabase } from "./supabase";
+import { db } from "@/db";
+import { supabase } from "@/sync/supabase";
 import type { Table } from "dexie";
 
 // Map Dexie table names to Supabase table names
@@ -55,13 +55,8 @@ class SyncService {
       });
 
       table.hook("updating", function (mods: any, primKey: any, obj: any, _transaction: any) {
-        // @ts-ignore
         this.onsuccess = function (_updatedKey: any) {
           if (self.isSyncing || !self.userId) return;
-          // mods contains the modifications. obj is the old object.
-          // We merge to get the final state.
-          // Note: This is a shallow merge. Deep merge might be needed if mods are partial.
-          // But usually Dexie updates are either full replace (put) or shallow patches.
           const finalObj = { ...obj, ...mods, id: primKey };
           self.pushChange(tableName, "UPDATE", finalObj);
         };

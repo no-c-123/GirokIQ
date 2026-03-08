@@ -1,6 +1,6 @@
-import type { Action } from "./types";
-import { useBlockStore } from "../stores/useBlockStore";
-import { useCanvasStore } from "../stores/useCanvasStore";
+import type { Action } from "@/history/types";
+import { useBlockStore } from "@/stores/useBlockStore";
+import { useCanvasStore } from "@/stores/useCanvasStore";
 
 export async function applyUndo(action: Action) {
   const blocks = useBlockStore.getState();

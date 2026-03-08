@@ -1,9 +1,9 @@
 import Dexie, { type Table } from "dexie";
-import type { Folder } from "../data/models/folder";
-import type { Notebook } from "../data/models/notebook";
-import type { Page } from "../data/models/page";
-import type { Block } from "../data/models/block";
-import type { CanvasElement } from "../data/models/canvas";
+import type { Folder } from "@/data/models/folder";
+import type { Notebook } from "@/data/models/notebook";
+import type { Page } from "@/data/models/page";
+import type { Block } from "@/data/models/block";
+import type { CanvasElement } from "@/data/models/canvas";
 
 export interface StrokeRow {
   id: string;

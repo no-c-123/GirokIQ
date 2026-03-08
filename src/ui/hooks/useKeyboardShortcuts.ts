@@ -1,9 +1,9 @@
 import { useEffect } from "react";
-import { useAppStore } from "../../store/useAppStore";
-import { useCanvasStore } from "../../stores/useCanvasStore";
-import { useUIStore } from "../../stores/useUIStore";
-import { useHistoryStore } from "../../history/useHistoryStore";
-import { useBlockStore } from "../../stores/useBlockStore";
+import { useAppStore } from "@/store/useAppStore";
+import { useCanvasStore } from "@/stores/useCanvasStore";
+import { useUIStore } from "@/stores/useUIStore";
+import { useHistoryStore } from "@/history/useHistoryStore";
+import { useBlockStore } from "@/stores/useBlockStore";
 
 export interface Shortcut {
   id: string;

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Image as KonvaImage, Transformer } from "react-konva";
 import Konva from "konva";
-import { useBlockStore } from "../../stores/useBlockStore";
-import type { Block } from "../../data/models/block";
+import { useBlockStore } from "@/stores/useBlockStore";
+import type { Block } from "@/data/models/block";
 
 export function ImageBlock({ 
   block, 

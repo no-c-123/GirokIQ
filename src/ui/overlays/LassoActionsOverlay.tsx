@@ -1,6 +1,6 @@
 import { Camera, Type } from "lucide-react";
-import { useCanvasStore } from "../../stores/useCanvasStore";
-import { useBlockStore } from "../../stores/useBlockStore";
+import { useCanvasStore } from "@/stores/useCanvasStore";
+import { useBlockStore } from "@/stores/useBlockStore";
 import { Stage } from "konva/lib/Stage";
 
 interface ViewState {

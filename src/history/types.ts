@@ -1,5 +1,5 @@
-import type { StrokeElement } from "../elements/types";
-import type { Block } from "../data/models/block";
+import type { StrokeElement } from "@/elements/types";
+import type { Block } from "@/data/models/block";
 
 export type Action =
   | {

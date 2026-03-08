@@ -1,6 +1,6 @@
 import { useEffect } from "react";
-import { useAppStore } from "../store/useAppStore";
-import { useBlockStore } from "../stores/useBlockStore";
+import { useAppStore } from "@/store/useAppStore";
+import { useBlockStore } from "@/stores/useBlockStore";
 
 interface ViewState {
   zoom: number;

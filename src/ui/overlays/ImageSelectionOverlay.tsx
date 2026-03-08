@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Trash2 } from "lucide-react";
-import { useBlockStore } from "../../stores/useBlockStore";
-import { useUIStore } from "../../stores/useUIStore";
+import { useBlockStore } from "@/stores/useBlockStore";
+import { useUIStore } from "@/stores/useUIStore";
 
 interface ViewState {
   position: { x: number; y: number };

@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef } from "react";
-import { Sidebar } from "../ui/components/Sidebar";
-import { Editor } from "../editor/Editor";
-import { NewPageModal } from "../ui/components/NewPageModal";
-import { useAppStore } from "../store/useAppStore";
-import { useKeyboardShortcuts } from "../ui/hooks/useKeyboardShortcuts";
+import { Sidebar } from "@/ui/components/Sidebar";
+import { Editor } from "@/editor/Editor";
+import { NewPageModal } from "@/ui/components/NewPageModal";
+import { useAppStore } from "@/store/useAppStore";
+import { useKeyboardShortcuts } from "@/ui/hooks/useKeyboardShortcuts";
 import { Plus, ArrowDown } from "lucide-react";
 
 export default function App() {
@@ -21,8 +21,31 @@ export default function App() {
   const activePageId = useAppStore((s) => s.activePageId);
   const addPage = useAppStore((s) => s.addPage);
   const sidebarVisible = useAppStore((s) => s.sidebarVisible);
+  const settings = useAppStore((s) => s.settings);
 
   useKeyboardShortcuts();
+
+  useEffect(() => {
+    // Apply theme on mount and when settings change
+    const applyTheme = (theme: string) => {
+      if (theme === "system") {
+        const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.classList.toggle("dark", isDark);
+      } else {
+        document.documentElement.classList.toggle("dark", theme === "dark");
+      }
+    };
+    
+    applyTheme(settings.theme);
+    
+    // Listen for system theme changes if using system theme
+    if (settings.theme === "system") {
+      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+      const handler = (e: MediaQueryListEvent) => document.documentElement.classList.toggle("dark", e.matches);
+      mediaQuery.addEventListener("change", handler);
+      return () => mediaQuery.removeEventListener("change", handler);
+    }
+  }, [settings.theme]);
 
   useEffect(() => {
     const preventDefault = (e: WheelEvent) => {
@@ -131,9 +154,9 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="h-screen w-screen bg-black flex items-center justify-center text-zinc-500">
+      <div className="h-screen w-screen bg-[var(--bg-app)] flex items-center justify-center text-[var(--text-secondary)]">
         <div className="animate-pulse flex flex-col items-center">
-          <div className="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin mb-4" />
+          <div className="w-8 h-8 rounded-full border-2 border-[var(--accent-primary)] border-t-transparent animate-spin mb-4" />
           <span className="text-sm tracking-widest uppercase">Loading Syllabus...</span>
         </div>
       </div>
@@ -141,11 +164,11 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen w-screen bg-zinc-950 text-zinc-100 flex overflow-hidden font-sans selection:bg-indigo-500/30 selection:text-indigo-200">
+    <div className="h-screen w-screen bg-[var(--bg-app)] text-[var(--text-primary)] flex overflow-hidden font-sans selection:bg-[var(--accent-primary)]/30 selection:text-[var(--accent-primary)] transition-colors duration-300">
       {/* Background Ambience */}
-      <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-900/10 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-900/10 rounded-full blur-[120px]" />
+      <div className="fixed inset-0 pointer-events-none opacity-50 dark:opacity-100">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[var(--accent-primary)]/5 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/5 rounded-full blur-[120px]" />
       </div>
 
       {/* Sidebar */}
@@ -166,7 +189,7 @@ export default function App() {
           className="absolute top-0 left-0 right-0 flex justify-center pointer-events-none z-60"
           style={{ transform: `translateY(${pullDistance - 40}px)`, opacity: pullDistance / PULL_THRESHOLD }}
         >
-          <div className={`flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900 border border-white/10 shadow-xl transition-colors ${pullDistance >= PULL_THRESHOLD ? 'text-indigo-400 border-indigo-500/30' : 'text-zinc-500'}`}>
+          <div className={`flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--bg-panel)] border border-[var(--border-subtle)] shadow-xl transition-colors ${pullDistance >= PULL_THRESHOLD ? 'text-[var(--accent-primary)] border-[var(--accent-primary)]/30' : 'text-[var(--text-secondary)]'}`}>
             {pullDistance >= PULL_THRESHOLD ? <Plus className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
             <span className="text-xs font-medium uppercase tracking-wider">
               {pullDistance >= PULL_THRESHOLD ? 'Release for New Page' : 'Pull for New Page'}

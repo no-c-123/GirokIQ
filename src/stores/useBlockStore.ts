@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { nanoid } from "nanoid";
-import { db } from "../db";
-import type { Block } from "../data/models/block";
+import { db } from "@/db";
+import type { Block } from "@/data/models/block";
 
 interface BlockState {
   blocks: Block[];

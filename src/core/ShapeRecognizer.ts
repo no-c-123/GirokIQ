@@ -4,7 +4,7 @@ import {
   getDistance,
   getPathLength,
   distToSegment,
-} from "./geometry";
+} from "@/core/geometry";
 
 export type ShapeType = "line" | "rectangle" | "circle" | "ellipse" | "triangle";
 

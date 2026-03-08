@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { supabase } from '../sync/supabase';
-import { syncService } from '../sync/sync';
+import { supabase } from '@/sync/supabase';
+import { syncService } from '@/sync/sync';
 import type { Session, User } from '@supabase/supabase-js';
 
 interface AuthState {

@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { cn } from "../../utils";
-import { useBlockStore } from "../../stores/useBlockStore";
-import { useHistoryStore } from "../../history/useHistoryStore";
-import { useUIStore } from "../../stores/useUIStore";
-import type { Block } from "../../data/models/block";
+import { cn } from "@/utils";
+import { useBlockStore } from "@/stores/useBlockStore";
+import { useHistoryStore } from "@/history/useHistoryStore";
+import { useUIStore } from "@/stores/useUIStore";
+import type { Block } from "@/data/models/block";
 import { Trash2 } from "lucide-react";
 
 export function TextBlock({ block }: { block: Block }) {

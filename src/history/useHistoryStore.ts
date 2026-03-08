@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import type { Action } from "./types";
-import { applyRedo, applyUndo } from "./apply";
+import type { Action } from "@/history/types";
+import { applyRedo, applyUndo } from "@/history/apply";
 
 interface HistoryState {
   past: Action[];

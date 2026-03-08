@@ -9,6 +9,7 @@ interface NamingModalProps {
   title: string;
   placeholder?: string;
   defaultValue?: string;
+  confirmLabel?: string;
 }
 
 export function NamingModal({ 
@@ -17,7 +18,8 @@ export function NamingModal({
   onConfirm, 
   title, 
   placeholder = "Enter name...",
-  defaultValue = ""
+  defaultValue = "",
+  confirmLabel = "Create"
 }: NamingModalProps) {
   const [name, setName] = useState(defaultValue);
 
@@ -83,7 +85,7 @@ export function NamingModal({
                   disabled={!name.trim()}
                   className="flex-1 px-4 py-2 text-sm font-medium bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 disabled:hover:bg-indigo-500 text-white rounded-lg transition-colors shadow-lg shadow-indigo-500/20"
                 >
-                  Create
+                  {confirmLabel}
                 </button>
               </div>
             </form>

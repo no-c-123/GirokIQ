@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../sync/supabase';
+import { supabase } from '@/sync/supabase';
 import { ArrowLeft, Loader2, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 
 interface LoginPageProps {

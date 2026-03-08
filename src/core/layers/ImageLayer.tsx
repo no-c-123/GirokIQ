@@ -1,9 +1,9 @@
 import { Layer } from "react-konva";
-import { ImageBlock } from "../../ui/blocks/ImageBlock";
-import { useBlockStore } from "../../stores/useBlockStore";
+import { ImageBlock } from "@/ui/blocks/ImageBlock";
+import { useBlockStore } from "@/stores/useBlockStore";
 import { useMemo, memo } from "react";
-import { useUIStore } from "../../stores/useUIStore";
-import { useAppStore } from "../../store/useAppStore";
+import { useUIStore } from "@/stores/useUIStore";
+import { useAppStore } from "@/store/useAppStore";
 
 export const ImageLayer = memo(function ImageLayer() {
   const activePageId = useAppStore((s) => s.activePageId);

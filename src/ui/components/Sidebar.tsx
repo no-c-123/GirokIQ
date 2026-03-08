@@ -15,13 +15,13 @@ import {
   BookPlus
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { cn } from "../../utils";
-import type { Folder } from "../../data/types";
-import type { Notebook } from "../../data/types";
-import type { Page } from "../../pages/types";
-import { useAppStore } from "../../store/useAppStore";
-import { NamingModal } from "./NamingModal";
-import { SettingsModal } from "./SettingsModal";
+import { cn } from "@/utils";
+import type { Folder } from "@/data/types";
+import type { Notebook } from "@/data/types";
+import type { Page } from "@/pages/types";
+import { useAppStore } from "@/store/useAppStore";
+import { NamingModal } from "@/ui/components/NamingModal";
+import { SettingsModal } from "@/ui/components/SettingsModal";
 
 export function Sidebar() {
   const folders = useAppStore((s) => s.folders);
@@ -31,16 +31,22 @@ export function Sidebar() {
   const setActivePage = useAppStore((s) => s.setActivePage);
   const addPage = useAppStore((s) => s.addPage);
   const deletePage = useAppStore((s) => s.deletePage);
+  const renamePage = useAppStore((s) => s.renamePage);
   const addFolder = useAppStore((s) => s.addFolder);
   const addNotebook = useAppStore((s) => s.addNotebook);
   const deleteFolder = useAppStore((s) => s.deleteFolder);
   const deleteNotebook = useAppStore((s) => s.deleteNotebook);
+  const renameFolder = useAppStore((s) => s.renameFolder);
+  const renameNotebook = useAppStore((s) => s.renameNotebook);
 
   const [namingModal, setNamingModal] = useState<{
     isOpen: boolean;
-    type: "folder" | "notebook";
-    parentId?: string;
-  }>({ isOpen: false, type: "folder" });
+    type: "folder" | "notebook" | "page";
+    mode: "create" | "rename";
+    parentId?: string; // For creating: folderId (if creating notebook) or notebookId (if creating page)
+    targetId?: string; // For renaming: the id of the item being renamed
+    initialValue?: string;
+  }>({ isOpen: false, type: "folder", mode: "create" });
   const [showSettings, setShowSettings] = useState(false);
 
   const handleDeletePage = (id: string) => {
@@ -62,22 +68,32 @@ export function Sidebar() {
   };
 
   const handleCreateNaming = (name: string) => {
-    if (namingModal.type === "folder") {
-      const newFolder: Folder = {
-        id: crypto.randomUUID(),
-        name,
-        parentId: null,
-        createdAt: Date.now(),
-      };
-      void addFolder(newFolder);
+    if (namingModal.mode === "rename") {
+      if (namingModal.type === "folder" && namingModal.targetId) {
+        void renameFolder(namingModal.targetId, name);
+      } else if (namingModal.type === "notebook" && namingModal.targetId) {
+        void renameNotebook(namingModal.targetId, name);
+      } else if (namingModal.type === "page" && namingModal.targetId) {
+        void renamePage(namingModal.targetId, name);
+      }
     } else {
-      const newNotebook: Notebook = {
-        id: crypto.randomUUID(),
-        name,
-        folderId: namingModal.parentId || null,
-        createdAt: Date.now(),
-      };
-      void addNotebook(newNotebook);
+      if (namingModal.type === "folder") {
+        const newFolder: Folder = {
+          id: crypto.randomUUID(),
+          name,
+          parentId: null,
+          createdAt: Date.now(),
+        };
+        void addFolder(newFolder);
+      } else if (namingModal.type === "notebook") {
+        const newNotebook: Notebook = {
+          id: crypto.randomUUID(),
+          name,
+          folderId: namingModal.parentId || null,
+          createdAt: Date.now(),
+        };
+        void addNotebook(newNotebook);
+      }
     }
     setNamingModal({ ...namingModal, isOpen: false });
   };
@@ -108,31 +124,31 @@ export function Sidebar() {
 
   return (
     <>
-      <aside className="h-full w-70 flex flex-col bg-zinc-900/30 backdrop-blur-xl border-r border-white/5 text-zinc-400">
+      <aside className="layout-sidebar h-full w-70 flex flex-col backdrop-blur-xl text-[var(--text-secondary)] transition-colors duration-300">
         {/* Header */}
         <div className="p-4 pt-6">
           <div className="flex items-center gap-2 mb-6 px-2">
-            <div className="w-6 h-6 rounded-md bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.3)]">
-              <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
+            <div className="w-6 h-6 rounded-md bg-[var(--accent-subtle)] flex items-center justify-center border border-[var(--accent-primary)]/30 shadow-[0_0_15px_rgba(99,102,241,0.3)]">
+              <div className="w-2 h-2 rounded-full bg-[var(--accent-primary)] animate-pulse" />
             </div>
-            <span className="font-medium text-zinc-100 tracking-tight">Syllabus</span>
+            <span className="font-medium text-[var(--text-primary)] tracking-tight">Syllabus</span>
           </div>
 
           {/* Search */}
           <div className="relative group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-indigo-400 transition-colors" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-tertiary)] group-focus-within:text-[var(--accent-primary)] transition-colors" />
             <input 
               type="text" 
               placeholder="Search..." 
-              className="w-full bg-black/20 border border-white/5 rounded-lg py-2 pl-9 pr-3 text-sm text-zinc-300 focus:outline-none focus:border-indigo-500/30 focus:bg-indigo-500/5 transition-all placeholder:text-zinc-600"
+              className="w-full bg-[var(--bg-panel)] border border-[var(--border-subtle)] rounded-lg py-2 pl-9 pr-3 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]/30 focus:bg-[var(--accent-subtle)]/10 transition-all placeholder:text-[var(--text-tertiary)]"
             />
           </div>
         </div>
 
         {/* Navigation Tree */}
-        <div className="flex-1 overflow-y-auto px-2 py-2 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+        <div className="flex-1 overflow-y-auto px-2 py-2 scrollbar-thin scrollbar-thumb-[var(--border-strong)] scrollbar-track-transparent">
           <div className="space-y-0.5">
-            <div className="px-3 py-1.5 text-xs font-medium text-zinc-600 uppercase tracking-wider mb-1">
+            <div className="px-3 py-1.5 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider mb-1">
               Library
             </div>
             
@@ -148,59 +164,64 @@ export function Sidebar() {
                 onDeletePage={handleDeletePage}
                 onDeleteFolder={handleDeleteFolder}
                 onDeleteNotebook={handleDeleteNotebook}
-                onAddNotebook={(folderId) => setNamingModal({ isOpen: true, type: "notebook", parentId: folderId })}
+                onRenameNotebook={(id, name) => setNamingModal({ isOpen: true, type: "notebook", mode: "rename", targetId: id, initialValue: name })}
+                onRenamePage={(id, name) => setNamingModal({ isOpen: true, type: "page", mode: "rename", targetId: id, initialValue: name })}
+                onAddNotebook={(folderId) => setNamingModal({ isOpen: true, type: "notebook", mode: "create", parentId: folderId })}
+                onRenameFolder={(id, name) => setNamingModal({ isOpen: true, type: "folder", mode: "rename", targetId: id, initialValue: name })}
                 onAddPage={handleNewPage}
               />
             ))}
 
-            {/* Uncategorized Notebooks (if any) */}
-            {notebooks.filter(n => !n.folderId).map(notebook => (
-              <NotebookItem 
-                key={notebook.id} 
-                notebook={notebook} 
-                pages={pages.filter(p => p.notebookId === notebook.id)}
-                activePageId={activePageId || undefined}
-                onPageSelect={setActivePage}
-                onDeletePage={handleDeletePage}
-                onDeleteNotebook={handleDeleteNotebook}
-                onAddPage={handleNewPage}
-              />
-            ))}
+          {/* Uncategorized Notebooks (if any) */}
+          {notebooks.filter(n => !n.folderId).map(notebook => (
+            <NotebookItem 
+              key={notebook.id} 
+              notebook={notebook} 
+              pages={pages.filter(p => p.notebookId === notebook.id)}
+              activePageId={activePageId || undefined}
+              onPageSelect={setActivePage}
+              onDeletePage={handleDeletePage}
+              onDeleteNotebook={handleDeleteNotebook}
+              onRenameNotebook={(id, name) => setNamingModal({ isOpen: true, type: "notebook", mode: "rename", targetId: id, initialValue: name })}
+              onRenamePage={(id, name) => setNamingModal({ isOpen: true, type: "page", mode: "rename", targetId: id, initialValue: name })}
+              onAddPage={handleNewPage}
+            />
+          ))}
           </div>
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 border-t border-white/5 space-y-1">
+        <div className="p-4 border-t border-[var(--border-subtle)] space-y-1 bg-[var(--bg-sidebar)]">
           <div className="grid grid-cols-2 gap-2 mb-2">
             <button 
-              onClick={() => setNamingModal({ isOpen: true, type: "folder" })}
-              className="flex items-center justify-center gap-2 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-100 hover:bg-white/5 border border-white/5 rounded-lg transition-colors group"
+              onClick={() => setNamingModal({ isOpen: true, type: "folder", mode: "create" })}
+              className="flex items-center justify-center gap-2 py-2 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-panel)] border border-[var(--border-subtle)] rounded-lg transition-all active:scale-95 group shadow-sm"
               title="New Folder"
             >
-              <FolderPlus className="w-3.5 h-3.5 group-hover:text-indigo-400 transition-colors" />
+              <FolderPlus className="w-3.5 h-3.5 group-hover:text-[var(--accent-primary)] transition-colors" />
               <span>Folder</span>
             </button>
             <button 
-              onClick={() => setNamingModal({ isOpen: true, type: "notebook" })}
-              className="flex items-center justify-center gap-2 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-100 hover:bg-white/5 border border-white/5 rounded-lg transition-colors group"
+              onClick={() => setNamingModal({ isOpen: true, type: "notebook", mode: "create" })}
+              className="flex items-center justify-center gap-2 py-2 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-panel)] border border-[var(--border-subtle)] rounded-lg transition-all active:scale-95 group shadow-sm"
               title="New Notebook"
             >
-              <BookPlus className="w-3.5 h-3.5 group-hover:text-indigo-400 transition-colors" />
+              <BookPlus className="w-3.5 h-3.5 group-hover:text-[var(--accent-primary)] transition-colors" />
               <span>Notebook</span>
             </button>
           </div>
           <button 
             onClick={() => setShowSettings(true)}
-            className="flex items-center gap-3 w-full px-3 py-2 text-sm text-zinc-400 hover:text-zinc-100 hover:bg-white/5 rounded-lg transition-colors group"
+            className="flex items-center gap-3 w-full px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-panel)] rounded-lg transition-all group"
           >
-            <Settings className="w-4 h-4 group-hover:text-indigo-400 transition-colors" />
+            <Settings className="w-4 h-4 group-hover:text-[var(--accent-primary)] transition-colors" />
             <span>Settings</span>
           </button>
           <button 
             onClick={() => handleNewPage()}
-            className="flex items-center gap-3 w-full px-3 py-2 text-sm text-zinc-400 hover:text-zinc-100 hover:bg-white/5 rounded-lg transition-colors group"
+            className="flex items-center gap-3 w-full px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-panel)] rounded-lg transition-all group"
           >
-            <Plus className="w-4 h-4 group-hover:text-indigo-400 transition-colors" />
+            <Plus className="w-4 h-4 group-hover:text-[var(--accent-primary)] transition-colors" />
             <span>New Page</span>
           </button>
         </div>
@@ -209,8 +230,10 @@ export function Sidebar() {
           isOpen={namingModal.isOpen}
           onClose={() => setNamingModal({ ...namingModal, isOpen: false })}
           onConfirm={handleCreateNaming}
-          title={`Create New ${namingModal.type === "folder" ? "Folder" : "Notebook"}`}
+          title={namingModal.mode === "create" ? `Create New ${namingModal.type === "folder" ? "Folder" : "Notebook"}` : `Rename ${namingModal.type}`}
           placeholder={`Enter ${namingModal.type} name...`}
+          defaultValue={namingModal.initialValue}
+          confirmLabel={namingModal.mode === "create" ? "Create" : "Rename"}
         />
       </aside>
       <SettingsModal
@@ -221,7 +244,7 @@ export function Sidebar() {
   );
 }
 
-function FolderItem({ folder, notebooks, pages, activePageId, onPageSelect, onDeletePage, onDeleteFolder, onDeleteNotebook, onAddNotebook, onAddPage }: { 
+function FolderItem({ folder, notebooks, pages, activePageId, onPageSelect, onDeletePage, onDeleteFolder, onDeleteNotebook, onAddNotebook, onRenameFolder, onAddPage, onRenameNotebook, onRenamePage }: { 
   folder: Folder, 
   notebooks: Notebook[],
   pages: Page[],
@@ -231,7 +254,10 @@ function FolderItem({ folder, notebooks, pages, activePageId, onPageSelect, onDe
   onDeleteFolder: (id: string) => void,
   onDeleteNotebook: (id: string) => void,
   onAddNotebook: (folderId: string) => void,
-  onAddPage: (notebookId: string) => void
+  onRenameFolder: (id: string, name: string) => void,
+  onAddPage: (notebookId: string) => void,
+  onRenameNotebook: (id: string, name: string) => void,
+  onRenamePage: (id: string, name: string) => void
 }) {
   const [isOpen, setIsOpen] = useState(true);
   const [isOverflowHidden, setIsOverflowHidden] = useState(true);
@@ -241,15 +267,22 @@ function FolderItem({ folder, notebooks, pages, activePageId, onPageSelect, onDe
       <div className="flex items-center group/folder">
         <button 
           onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center flex-1 px-2 py-1.5 text-sm rounded-md hover:bg-white/5 text-zinc-300 hover:text-zinc-100 transition-colors group"
+          className="flex items-center flex-1 px-2 py-1.5 text-sm rounded-md hover:bg-[var(--bg-panel)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors group"
         >
-          <span className="mr-1 opacity-50 group-hover:opacity-100 transition-opacity text-zinc-500">
+          <span className="mr-1 opacity-50 group-hover:opacity-100 transition-opacity text-[var(--text-tertiary)]">
             {isOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
           </span>
-          <FolderIcon className="w-4 h-4 mr-2 text-zinc-400 group-hover:text-indigo-300 transition-colors" />
+          <FolderIcon className="w-4 h-4 mr-2 text-[var(--text-tertiary)] group-hover:text-[var(--accent-primary)] transition-colors" />
           <span className="truncate font-medium">{folder.name}</span>
         </button>
         <div className="flex items-center opacity-0 group-hover/folder:opacity-100 transition-opacity">
+            <button
+            onClick={() => onRenameFolder(folder.id, folder.name)}
+            className="p-1.5 text-zinc-500 hover:text-zinc-200 transition-all"
+            title="Rename Folder"
+            >
+            <Edit2 className="w-3.5 h-3.5" />
+            </button>
             <button
             onClick={() => onAddNotebook(folder.id)}
             className="p-1.5 text-zinc-500 hover:text-zinc-200 transition-all"
@@ -292,6 +325,8 @@ function FolderItem({ folder, notebooks, pages, activePageId, onPageSelect, onDe
                   onDeletePage={onDeletePage}
                   onDeleteNotebook={onDeleteNotebook}
                   onAddPage={onAddPage}
+                  onRenameNotebook={onRenameNotebook}
+                  onRenamePage={onRenamePage}
                 />
               ))}
               {notebooks.length === 0 && (
@@ -305,14 +340,16 @@ function FolderItem({ folder, notebooks, pages, activePageId, onPageSelect, onDe
   );
 }
 
-function NotebookItem({ notebook, pages, activePageId, onPageSelect, onDeletePage, onDeleteNotebook, onAddPage }: { 
+function NotebookItem({ notebook, pages, activePageId, onPageSelect, onDeletePage, onDeleteNotebook, onAddPage, onRenameNotebook, onRenamePage }: { 
   notebook: Notebook, 
   pages: Page[],
   activePageId?: string,
   onPageSelect: (id: string) => void,
   onDeletePage: (id: string) => void,
   onDeleteNotebook: (id: string) => void,
-  onAddPage: (notebookId: string) => void
+  onAddPage: (notebookId: string) => void,
+  onRenameNotebook: (id: string, name: string) => void,
+  onRenamePage: (id: string, name: string) => void
 }) {
   const [isOpen, setIsOpen] = useState(true);
   const [isOverflowHidden, setIsOverflowHidden] = useState(true);
@@ -322,15 +359,22 @@ function NotebookItem({ notebook, pages, activePageId, onPageSelect, onDeletePag
       <div className="flex items-center group/notebook">
         <button 
           onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center flex-1 px-2 py-1.5 text-sm rounded-md hover:bg-white/5 text-zinc-400 hover:text-zinc-200 transition-colors group"
+          className="flex items-center flex-1 px-2 py-1.5 text-sm rounded-md hover:bg-[var(--bg-panel)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors group"
         >
-          <span className="mr-1 opacity-50 group-hover:opacity-100 transition-opacity">
+          <span className="mr-1 opacity-50 group-hover:opacity-100 transition-opacity text-[var(--text-tertiary)]">
             {isOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
           </span>
-          <Book className="w-3.5 h-3.5 mr-2 text-zinc-500 group-hover:text-indigo-400/70 transition-colors" />
+          <Book className="w-3.5 h-3.5 mr-2 text-[var(--text-tertiary)] group-hover:text-[var(--accent-primary)]/70 transition-colors" />
           <span className="truncate">{notebook.name}</span>
         </button>
         <div className="flex items-center opacity-0 group-hover/notebook:opacity-100 transition-opacity">
+            <button
+            onClick={() => onRenameNotebook(notebook.id, notebook.name)}
+            className="p-1.5 text-zinc-500 hover:text-zinc-200 transition-all"
+            title="Rename Notebook"
+            >
+            <Edit2 className="w-3.5 h-3.5" />
+            </button>
             <button
             onClick={() => onAddPage(notebook.id)}
             className="p-1.5 text-zinc-500 hover:text-zinc-200 transition-all"
@@ -370,6 +414,7 @@ function NotebookItem({ notebook, pages, activePageId, onPageSelect, onDeletePag
                   isActive={activePageId === page.id}
                   onSelect={() => onPageSelect(page.id)}
                   onDelete={() => onDeletePage(page.id)}
+                  onRename={() => onRenamePage(page.id, page.title)}
                 />
               ))}
               {pages.length === 0 && (
@@ -383,11 +428,12 @@ function NotebookItem({ notebook, pages, activePageId, onPageSelect, onDeletePag
   );
 }
 
-function PageItem({ page, isActive, onSelect, onDelete }: { 
+function PageItem({ page, isActive, onSelect, onDelete, onRename }: { 
   page: Page, 
   isActive: boolean, 
   onSelect: () => void,
-  onDelete: () => void 
+  onDelete: () => void,
+  onRename: () => void
 }) {
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -410,36 +456,36 @@ function PageItem({ page, isActive, onSelect, onDelete }: {
       className={cn(
         "flex items-center w-full px-2 py-1.5 rounded-md transition-all group relative cursor-pointer select-none",
         isActive 
-          ? "bg-indigo-500/10 text-indigo-100 font-medium" 
-          : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5",
-        showMenu && "bg-white/5 text-zinc-200"
+          ? "bg-[var(--accent-subtle)]/50 text-[var(--accent-hover)] font-medium" 
+          : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-panel)]",
+        showMenu && "bg-[var(--bg-panel)] text-[var(--text-primary)]"
       )}
     >
       {isActive && (
         <motion.div 
           layoutId="active-indicator"
-          className="absolute left-0 w-0.5 h-4 bg-indigo-400 rounded-full shadow-[0_0_12px_rgba(129,140,248,0.8)]"
+          className="absolute left-0 w-0.5 h-4 bg-[var(--accent-primary)] rounded-full shadow-[0_0_12px_rgba(129,140,248,0.8)]"
         />
       )}
       <FileText className={cn(
         "w-3.5 h-3.5 mr-2 transition-colors",
-        isActive ? "text-indigo-300" : "text-zinc-600 group-hover:text-zinc-500"
+        isActive ? "text-[var(--accent-primary)]" : "text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)]"
       )} />
       <span className="truncate text-[13px]">{page.title}</span>
       
       {/* Three dots button */}
       <div 
         className={cn(
-          "ml-auto p-1 rounded hover:bg-white/10 transition-colors opacity-0 group-hover:opacity-100",
+          "ml-auto p-1 rounded hover:bg-[var(--bg-panel)] transition-colors opacity-0 group-hover:opacity-100",
           (isActive || showMenu) && "opacity-100",
-          showMenu && "bg-white/10 text-zinc-200"
+          showMenu && "bg-[var(--bg-panel)] text-[var(--text-primary)]"
         )}
         onClick={(e) => {
           e.stopPropagation();
           setShowMenu(!showMenu);
         }}
       >
-        <MoreHorizontal className="w-3 h-3 text-zinc-600 hover:text-zinc-300" />
+        <MoreHorizontal className="w-3 h-3 text-[var(--text-tertiary)] hover:text-[var(--text-primary)]" />
       </div>
 
       <AnimatePresence>

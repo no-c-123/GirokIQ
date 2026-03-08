@@ -1,9 +1,9 @@
 import { create } from "zustand";
-import { db } from "../db";
-import { seedIfEmpty } from "../data/seed";
-import type { Folder } from "../data/types";
-import type { Notebook } from "../data/types";
-import type { Page } from "../pages/types";
+import { db } from "@/db";
+import { seedIfEmpty } from "@/data/seed";
+import type { Folder } from "@/data/types";
+import type { Notebook } from "@/data/types";
+import type { Page } from "@/pages/types";
 
 interface AppState {
   folders: Folder[];
@@ -32,6 +32,8 @@ interface AppState {
   addNotebook: (notebook: Notebook) => Promise<void>;
   deleteFolder: (id: string) => Promise<void>;
   deleteNotebook: (id: string) => Promise<void>;
+  renameFolder: (id: string, name: string) => Promise<void>;
+  renameNotebook: (id: string, name: string) => Promise<void>;
   
   // Actions to populate data
   setFolders: (folders: Folder[]) => void;
@@ -281,6 +283,30 @@ export const useAppStore = create<AppState>((set) => ({
         activePageId: newActiveId,
       };
     });
+  },
+
+  renameFolder: async (id, name) => {
+    const existing = await db.folders.get(id);
+    if (!existing) return;
+
+    const updated: Folder = { ...existing, name };
+    await db.folders.put(updated);
+
+    set((state) => ({
+      folders: state.folders.map((f) => (f.id === id ? updated : f)),
+    }));
+  },
+
+  renameNotebook: async (id, name) => {
+    const existing = await db.notebooks.get(id);
+    if (!existing) return;
+
+    const updated: Notebook = { ...existing, name };
+    await db.notebooks.put(updated);
+
+    set((state) => ({
+      notebooks: state.notebooks.map((n) => (n.id === id ? updated : n)),
+    }));
   },
 
   setFolders: (folders) => set({ folders }),

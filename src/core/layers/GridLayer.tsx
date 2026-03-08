@@ -7,12 +7,18 @@ export const GridLayer = memo(function GridLayer({
   minX = 0,
   minY = 0,
   gridSize = 40,
+  gridColor = "#ffffff",
+  backgroundColor = "transparent",
+  opacity = 0.12,
 }: {
   width: number;
   height: number;
   minX?: number;
   minY?: number;
   gridSize?: number;
+  gridColor?: string;
+  backgroundColor?: string;
+  opacity?: number;
 }) {
   const startX = Math.floor(minX / gridSize) * gridSize;
   const startY = Math.floor(minY / gridSize) * gridSize;
@@ -21,14 +27,21 @@ export const GridLayer = memo(function GridLayer({
   const horizontalLineCount = Math.ceil((height) / gridSize) + 1;
 
   return (
-    <Layer listening={false} opacity={0.12}>
+    <Layer listening={false} opacity={opacity}>
+      {/* Background */}
+      <Line
+        points={[minX, minY, minX + width, minY, minX + width, minY + height, minX, minY + height]}
+        fill={backgroundColor}
+        closed
+      />
+
       {Array.from({ length: verticalLineCount + 1 }, (_, index) => {
         const x = startX + index * gridSize;
         return (
           <Line
             key={`v-${x}`}
             points={[x, minY, x, minY + height]}
-            stroke="#ffffff"
+            stroke={gridColor}
             strokeWidth={1}
           />
         );
@@ -40,7 +53,7 @@ export const GridLayer = memo(function GridLayer({
           <Line
             key={`h-${y}`}
             points={[minX, y, minX + width, y]}
-            stroke="#ffffff"
+            stroke={gridColor}
             strokeWidth={1}
           />
         );
