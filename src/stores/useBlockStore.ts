@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { nanoid } from "nanoid";
+import { generateId } from "@/utils";
 import { db } from "@/db";
 import type { CanvasElement } from "@/data/models/canvas";
 
@@ -38,7 +38,7 @@ export const useBlockStore = create<BlockState>((set, get) => ({
     const userId = "00000000-0000-0000-0000-000000000000"; 
     
     const block: CanvasElement = {
-      id: nanoid(),
+      id: generateId(),
       pageId,
       userId,
       type: "text",
@@ -74,7 +74,7 @@ export const useBlockStore = create<BlockState>((set, get) => ({
     }
 
     const block: CanvasElement = {
-      id: nanoid(),
+      id: generateId(),
       pageId,
       userId,
       type: "image",

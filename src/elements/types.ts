@@ -25,7 +25,8 @@ export interface StrokeElement extends BaseElement {
   type: "stroke";
   points: number[];
   color: string;
-  width: number;
+  strokeWidth: number; // Changed from width to avoid conflict with BaseElement.width (bbox)
+  width: number; // Bounding box width
   pressures?: number[];
   shapeType?: string; // "rectangle" | "circle" | "diamond" | "arrow" | "line" | "ellipse"
   originalPoints?: number[];

@@ -3,6 +3,7 @@ import type { Folder } from "@/data/models/folder";
 import type { Notebook } from "@/data/models/notebook";
 import type { Page } from "@/data/models/page";
 import type { CanvasElement } from "@/data/models/canvas";
+import { generateId } from "@/utils";
 
 export interface StrokeRow {
   id: string;
@@ -99,6 +100,34 @@ export class AppDB extends Dexie {
         }));
         
         await tx.table("canvasElements").bulkAdd(newElements);
+      }
+    });
+
+    // V5: Fix IDs to be valid UUIDs
+    this.version(5).upgrade(async tx => {
+      // Migrate strokes
+      const strokes = await tx.table("strokes").toArray();
+      const updatedStrokes = strokes
+        .filter(s => s.id && s.id.length !== 36) // Assume valid UUIDs are 36 chars
+        .map(s => ({ ...s, id: generateId() }));
+      
+      if (updatedStrokes.length > 0) {
+        // We have to delete old ones and add new ones because primary key changed
+        const oldIds = strokes.filter(s => s.id && s.id.length !== 36).map(s => s.id);
+        await tx.table("strokes").bulkDelete(oldIds);
+        await tx.table("strokes").bulkAdd(updatedStrokes);
+      }
+
+      // Migrate canvasElements
+      const elements = await tx.table("canvasElements").toArray();
+      const updatedElements = elements
+        .filter(e => e.id && e.id.length !== 36)
+        .map(e => ({ ...e, id: generateId() }));
+
+      if (updatedElements.length > 0) {
+        const oldIds = elements.filter(e => e.id && e.id.length !== 36).map(e => e.id);
+        await tx.table("canvasElements").bulkDelete(oldIds);
+        await tx.table("canvasElements").bulkAdd(updatedElements);
       }
     });
   }

@@ -138,9 +138,10 @@ export const useAppStore = create<AppState>((set) => ({
   },
 
   deletePage: async (id) => {
-    await db.pages.delete(id);
+    // Delete content first to avoid FK constraint issues during sync
     await db.strokes.where("pageId").equals(id).delete();
     await db.canvasElements.where("pageId").equals(id).delete();
+    await db.pages.delete(id);
 
     set((state) => {
       const newPages = state.pages.filter((p) => p.id !== id);
@@ -197,26 +198,30 @@ export const useAppStore = create<AppState>((set) => ({
   },
 
   deleteFolder: async (id) => {
-    // 1. Delete the folder itself
-    await db.folders.delete(id);
-
-    // 2. Find all notebooks in this folder
+    // 1. Find all notebooks in this folder
     const notebooksToDelete = await db.notebooks.where("folderId").equals(id).toArray();
     const notebookIds = notebooksToDelete.map((n) => n.id);
 
-    // 3. For each notebook, find all pages
+    // 2. For each notebook, find all pages
     const pagesToDelete = await db.pages.where("notebookId").anyOf(notebookIds).toArray();
     const pageIds = pagesToDelete.map((p) => p.id);
 
-    // 4. Delete notebooks and pages
-    await db.notebooks.bulkDelete(notebookIds);
-    await db.pages.bulkDelete(pageIds);
-
-    // 5. Delete strokes and blocks for these pages
+    // 3. Delete strokes and blocks for these pages (Leaves first)
     if (pageIds.length > 0) {
       await db.strokes.where("pageId").anyOf(pageIds).delete();
       await db.canvasElements.where("pageId").anyOf(pageIds).delete();
+      
+      // 4. Delete pages
+      await db.pages.bulkDelete(pageIds);
     }
+
+    // 5. Delete notebooks
+    if (notebookIds.length > 0) {
+      await db.notebooks.bulkDelete(notebookIds);
+    }
+
+    // 6. Delete the folder itself (Root last)
+    await db.folders.delete(id);
 
     set((state) => {
       const newFolders = state.folders.filter((f) => f.id !== id);
@@ -245,21 +250,21 @@ export const useAppStore = create<AppState>((set) => ({
   },
 
   deleteNotebook: async (id) => {
-    // 1. Delete the notebook itself
-    await db.notebooks.delete(id);
-
-    // 2. Find all pages in this notebook
+    // 1. Find all pages in this notebook
     const pagesToDelete = await db.pages.where("notebookId").equals(id).toArray();
     const pageIds = pagesToDelete.map((p) => p.id);
 
-    // 3. Delete pages
-    await db.pages.bulkDelete(pageIds);
-
-    // 4. Delete strokes and blocks for these pages
+    // 2. Delete strokes and blocks for these pages (Leaves first)
     if (pageIds.length > 0) {
       await db.strokes.where("pageId").anyOf(pageIds).delete();
       await db.canvasElements.where("pageId").anyOf(pageIds).delete();
+      
+      // 3. Delete pages
+      await db.pages.bulkDelete(pageIds);
     }
+
+    // 4. Delete the notebook itself (Root last)
+    await db.notebooks.delete(id);
 
     set((state) => {
       const newNotebooks = state.notebooks.filter((n) => n.id !== id);
