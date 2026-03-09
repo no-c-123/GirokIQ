@@ -89,6 +89,30 @@ export class QuadTree<T> {
     );
   }
   
+  remove(item: SpatialItem<T>): boolean {
+    if (!this.intersects(this.bounds, item)) {
+      return false;
+    }
+
+    // Check if item is in this node's items
+    const index = this.items.findIndex(i => i.data === item.data);
+    if (index !== -1) {
+      this.items.splice(index, 1);
+      return true;
+    }
+
+    if (this.divided) {
+      return (
+        this.children[0].remove(item) ||
+        this.children[1].remove(item) ||
+        this.children[2].remove(item) ||
+        this.children[3].remove(item)
+      );
+    }
+
+    return false;
+  }
+
   clear() {
     this.items = [];
     this.children = [];

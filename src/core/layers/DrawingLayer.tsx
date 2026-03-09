@@ -2,7 +2,7 @@ import { Layer, Group, Path } from "react-konva";
 import type { StrokeElement } from "@/elements/types";
 import { useMemo, useRef, useEffect, memo } from "react";
 import Konva from "konva";
-import { QuadTree } from "@/spatial/QuadTree";
+import { spatialIndex } from "@/spatial/SpatialIndex";
 
 const TILE_SIZE = 1024;
 
@@ -120,47 +120,12 @@ export function DrawingLayer({
   selectionOffset?: { x: number; y: number };
   viewport?: Viewport;
 }) {
-  // Use useMemo for QuadTree to ensure it's synchronous with render
-  const quadTree = useMemo(() => {
-    // Large fixed bounds for infinite canvas
-    const minX = -1000000;
-    const minY = -1000000;
-    const maxX = 1000000;
-    const maxY = 1000000;
-
-    const qt = new QuadTree<StrokeElement>({
-        x: minX,
-        y: minY,
-        width: maxX - minX,
-        height: maxY - minY
-    });
-
-    for (const stroke of strokes) {
-        if (stroke.points.length < 2) continue;
-        
-        let sMinX = Infinity, sMinY = Infinity, sMaxX = -Infinity, sMaxY = -Infinity;
-        for (let i = 0; i < stroke.points.length; i += 2) {
-            sMinX = Math.min(sMinX, stroke.points[i]);
-            sMinY = Math.min(sMinY, stroke.points[i+1]);
-            sMaxX = Math.max(sMaxX, stroke.points[i]);
-            sMaxY = Math.max(sMaxY, stroke.points[i+1]);
-        }
-
-        qt.insert({
-            x: sMinX,
-            y: sMinY,
-            width: sMaxX - sMinX,
-            height: sMaxY - sMinY,
-            data: stroke
-        });
-    }
-    
-    return qt;
-  }, [strokes]);
-
   // Calculate visible tiles based on viewport
   const visibleTileKeys = useMemo(() => {
     if (!viewport) return [];
+    
+    // Debug logging
+    // console.log(`[Render] Viewport:`, viewport);
     
     const startX = Math.floor((-viewport.x / viewport.zoom) / TILE_SIZE);
     const startY = Math.floor((-viewport.y / viewport.zoom) / TILE_SIZE);
@@ -183,18 +148,22 @@ export function DrawingLayer({
         const tileX = key.x * TILE_SIZE;
         const tileY = key.y * TILE_SIZE;
         
-        const found = quadTree.query({
+        const found = spatialIndex.query({
             x: tileX,
             y: tileY,
             width: TILE_SIZE,
             height: TILE_SIZE
         });
+        
+        if (found.length > 0) {
+            // console.log(`[Render] Tile ${key.x},${key.y} has ${found.length} strokes`);
+            // console.log(`[Render] First stroke in tile:`, found[0].points.slice(0, 4));
+        }
 
         // Deduplicate strokes that might cross tile boundaries if needed,
         // but here we just render them. React key handles uniqueness.
         // Filter out selected strokes from the frozen tiles
         const tileStrokes = found
-            .map(item => item.data)
             .filter(stroke => !selectedIds.includes(stroke.id));
         
         return (
@@ -206,7 +175,7 @@ export function DrawingLayer({
             />
         );
     });
-  }, [visibleTileKeys, quadTree, selectedIds]); 
+  }, [visibleTileKeys, strokes, selectedIds]); 
 
   // Render selected strokes separately (live, not cached)
   const selectedStrokesLayer = useMemo(() => {
@@ -302,7 +271,7 @@ const Tile = memo(function Tile({ x, y, strokes }: { x: number, y: number, strok
                 key={stroke.id}
                 data={pathData}
                 stroke={stroke.color}
-                strokeWidth={stroke.width}
+                strokeWidth={Number.isFinite(stroke.strokeWidth) ? stroke.strokeWidth : (Number.isFinite(stroke.width) && stroke.width < 50 ? stroke.width : 2)}
                 dash={stroke.strokeStyle === "dashed" ? [10, 10] : stroke.strokeStyle === "dotted" ? [5, 5] : undefined}
                 opacity={stroke.opacity ? stroke.opacity / 100 : 1}
                 fill={stroke.backgroundColor && stroke.backgroundColor !== "transparent" ? stroke.backgroundColor : undefined}
@@ -317,16 +286,20 @@ const Tile = memo(function Tile({ x, y, strokes }: { x: number, y: number, strok
 
     useEffect(() => {
         if (groupRef.current) {
-            // Add padding to cache area to prevent clipping strokes at tile boundaries
-            const padding = 100;
-            groupRef.current.cache({
-                x: x - padding,
-                y: y - padding,
-                width: TILE_SIZE + (padding * 2),
-                height: TILE_SIZE + (padding * 2),
-            });
+            // Check if group has content
+            const bounds = groupRef.current.getClientRect({ skipTransform: true });
+            
+            if (bounds.width > 0 && bounds.height > 0) {
+                 const padding = 100;
+                 groupRef.current.cache({
+                    x: -padding,
+                    y: -padding,
+                    width: TILE_SIZE + (padding * 2),
+                    height: TILE_SIZE + (padding * 2),
+                 });
+            }
         }
-    }, [paths, x, y]);
+    }, [paths]);
 
     if (strokes.length === 0) return null;
 
@@ -334,8 +307,29 @@ const Tile = memo(function Tile({ x, y, strokes }: { x: number, y: number, strok
         <Group 
             ref={groupRef} 
             listening={false}
+            x={x}
+            y={y}
         >
-            {paths}
+            {paths.map((p, i) => {
+                // If we move the group to x,y, we need to offset the paths back by -x,-y
+                // because the paths have absolute coordinates.
+                // Cloning the React element to add transformation
+                // But p is a JSX element.
+                // We can wrap it in a Group with offset
+                return (
+                    <Group key={strokes[i].id} x={-x} y={-y}>
+                        {p}
+                    </Group>
+                )
+            })}
         </Group>
     );
+}, (prev, next) => {
+    if (prev.x !== next.x || prev.y !== next.y) return false;
+    if (prev.strokes.length !== next.strokes.length) return false;
+    // Check if stroke references are identical (fast due to immutable updates)
+    for (let i = 0; i < prev.strokes.length; i++) {
+        if (prev.strokes[i] !== next.strokes[i]) return false;
+    }
+    return true;
 });

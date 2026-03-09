@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback, type ReactNode } fro
 import { Stage } from "react-konva";
 import type { KonvaEventObject } from "konva/lib/Node";
 import { Minus, Plus } from "lucide-react";
-import { nanoid } from "nanoid";
+import { generateId } from "@/utils";
 import { useShapeSnapping } from "@/hooks/useShapeSnapping";
 import type { RecognizedShape } from "@/core/ShapeRecognizer";
 import { isStrokeInPolygon, isRectInPolygon } from "@/selection/selectionGeometry";
@@ -20,6 +20,7 @@ import { LassoActionsOverlay } from "@/ui/overlays/LassoActionsOverlay";
 import { LassoLayer } from "@/core/layers/LassoLayer";
 import Konva from "konva";
 import type { StrokeElement } from "@/elements/types";
+import { spatialIndex } from "@/spatial/SpatialIndex";
 
 const ZOOM_MIN = 0.1;
 const ZOOM_MAX = 10;
@@ -42,7 +43,8 @@ export default function CanvasArea({
   const elements = useCanvasStore((s) => s.elements);
   const addElement = useCanvasStore((s) => s.addElement);
   const removeElement = useCanvasStore((s) => s.removeElement);
-  const updateElement = useCanvasStore((s) => s.updateElement);
+  // const updateElement = useCanvasStore((s) => s.updateElement);
+  const updateElements = useCanvasStore((s) => s.updateElements);
   const loadStrokesForPage = useCanvasStore((s) => s.loadStrokesForPage);
 
   const strokes = useMemo(() => elements.filter((e): e is StrokeElement => e.type === 'stroke'), [elements]);
@@ -83,12 +85,21 @@ export default function CanvasArea({
   const selectionFilter = { images: true, text: true, strokes: true }; 
   
   const updateStrokes = async (updates: { id: string; points: number[] }[]) => {
-      updates.forEach(u => updateElement(u.id, { points: u.points }));
+      updateElements(updates.map(u => ({ id: u.id, changes: { points: u.points } })));
   };
 
   const eraseAtPoint = (pageId: string, point: { x: number; y: number }) => {
     const eraseRadiusSquared = ERASE_RADIUS * ERASE_RADIUS;
-    const strokeToErase = strokes.find((stroke) => {
+    
+    // Use spatial index for fast querying
+    const candidates = spatialIndex.query({
+        x: point.x - ERASE_RADIUS,
+        y: point.y - ERASE_RADIUS,
+        width: ERASE_RADIUS * 2,
+        height: ERASE_RADIUS * 2
+    });
+
+    const strokeToErase = candidates.find((stroke) => {
       if (stroke.pageId !== pageId) return false;
       for (let index = 0; index < stroke.points.length; index += 2) {
         const dx = stroke.points[index] - point.x;
@@ -504,8 +515,17 @@ export default function CanvasArea({
         pageId: "lasso",
         points: [localPoint.x, localPoint.y],
         color: "#6366f1",
-        width: 1 / stageScale,
+        width: 0,
+        height: 0,
+        x: localPoint.x,
+        y: localPoint.y,
+        strokeWidth: 1 / stageScale,
+        backgroundColor: "rgba(99, 102, 241, 0.1)",
         pressures: [0.5],
+        type: "stroke" as const,
+        strokeStyle: "dashed",
+        opacity: 1,
+        sloppiness: 0
       };
       setTempStroke(stroke);
       tempStrokeRef.current = stroke;
@@ -526,11 +546,15 @@ export default function CanvasArea({
     const pressure = 0.5; // Always neutral pressure
 
     const stroke = {
-      id: nanoid(),
+      id: generateId(),
       pageId: activePageId,
       points: [localPoint.x, localPoint.y],
       color,
-      width: strokeWidth,
+      strokeWidth: strokeWidth, // Explicitly set strokeWidth
+      width: 0, // Initial bbox width
+      height: 0, // Initial bbox height
+      x: localPoint.x,
+      y: localPoint.y,
       pressures: [pressure],
       shapeType: tool === "pen" ? undefined : tool,
       strokeStyle,
@@ -538,7 +562,7 @@ export default function CanvasArea({
       opacity,
       edges,
       sloppiness,
-    };
+    } as StrokeElement;
     
     // Imperative update for smoothness
     setTempStroke(stroke);
