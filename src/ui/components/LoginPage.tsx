@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/sync/supabase';
-import { ArrowLeft, Loader2, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 
 export function LoginPage() {
     const [isSignUp, setIsSignUp] = useState(false);
