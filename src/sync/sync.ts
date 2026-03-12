@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { supabase } from "@/sync/supabase";
-import Dexie, { type Table } from "dexie";
+import { type Table } from "dexie";
 
 // Map Dexie table names to Supabase table names
 const TABLE_MAPPING: Record<string, string> = {
@@ -67,7 +67,7 @@ class SyncService {
         };
       });
 
-      table.hook("deleting", function (primKey: any, _obj: any, transaction: any) {
+      table.hook("deleting", function (primKey: any, _obj: any, _transaction: any) {
         // Add to pending deletes to ensure it persists if offline
         // Must use ignoreTransaction because the current transaction only covers the table being deleted
         if (tableName !== "appState") {
