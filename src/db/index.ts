@@ -9,7 +9,7 @@ export interface StrokeRow {
   id: string;
   pageId: string;
   userId: string;
-  points: number[] | Uint8Array; // Support binary points
+  points: number[] | Uint8Array;
   color: string;
   width: number;
   pressures?: number[];
@@ -24,6 +24,13 @@ export interface AppStateRow {
   updatedAt: number;
 }
 
+export interface PendingDelete {
+  id?: number;
+  tableName: string;
+  recordId: string;
+  date: number;
+}
+
 export class AppDB extends Dexie {
   folders!: Table<Folder, string>;
   notebooks!: Table<Notebook, string>;
@@ -31,6 +38,7 @@ export class AppDB extends Dexie {
   canvasElements!: Table<CanvasElement, string>;
   strokes!: Table<StrokeRow, string>;
   appState!: Table<AppStateRow, string>;
+  pendingDeletes!: Table<PendingDelete, number>;
 
   constructor() {
     super("syllabus-db");
@@ -104,7 +112,15 @@ export class AppDB extends Dexie {
     });
 
     // V5: Fix IDs to be valid UUIDs
-    this.version(5).upgrade(async tx => {
+    this.version(5).stores({
+      folders: "id, parentId, userId, createdAt",
+      notebooks: "id, folderId, userId, createdAt",
+      pages: "id, notebookId, userId, createdAt, updatedAt",
+      canvasElements: "id, pageId, userId, type, createdAt",
+      strokes: "id, pageId, userId",
+      appState: "key, updatedAt",
+      pendingDeletes: "++id, tableName, recordId"
+    }).upgrade(async tx => {
       // Migrate strokes
       const strokes = await tx.table("strokes").toArray();
       const updatedStrokes = strokes

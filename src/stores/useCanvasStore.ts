@@ -28,24 +28,34 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   currentElement: null,
 
   loadStrokesForPage: async (pageId) => {
-    const strokes = await db.strokes.where("pageId").equals(pageId).toArray();
-    // console.log(`[Load] Loading ${strokes.length} strokes for page ${pageId}`);
-    
-    // if (strokes.length > 0) {
-    //     console.log(`[Load] First stroke points type:`, typeof strokes[0].points);
-    //     console.log(`[Load] First stroke points sample:`, strokes[0].points.slice(0, 10));
-    //     if (strokes[0].points instanceof Uint8Array) {
-    //         console.log(`[Load] First stroke is Uint8Array`);
-    //     } else if (Array.isArray(strokes[0].points)) {
-    //         console.log(`[Load] First stroke is Array`);
-    //     } else {
-    //         console.log(`[Load] First stroke is something else:`, Object.prototype.toString.call(strokes[0].points));
-    //     }
-    // }
+    // Flush pending writes before switching context
+    if (pendingWrites.size > 0) {
+        if (persistenceTimeout) clearTimeout(persistenceTimeout);
+        persistenceTimeout = null;
+        
+        const currentElements = get().elements;
+        const idsToSave = Array.from(pendingWrites);
+        pendingWrites.clear();
+        
+        const strokesToSave = idsToSave
+            .map(id => currentElements.find(e => e.id === id))
+            .filter(e => e && e.type === 'stroke');
 
-    const loadedElements: CanvasElement[] = [
-      ...get().elements.filter(e => e.type !== 'stroke' || e.pageId !== pageId),
-      ...strokes.map(s => {
+        if (strokesToSave.length > 0) {
+            await db.strokes.bulkPut(strokesToSave as any[]);
+        }
+    }
+
+    // Clear current strokes from state and spatial index to avoid flash/leak
+    set(state => ({
+        elements: state.elements.filter(e => e.type !== 'stroke' || e.pageId === pageId)
+    }));
+    spatialIndex.initialize([]);
+
+    const strokes = await db.strokes.where("pageId").equals(pageId).toArray();
+
+    // Map fetched strokes to CanvasElements
+    const fetchedElements = strokes.map(s => {
           // Convert binary points to number array if needed
           let points: number[] = [];
           if (s.points instanceof Uint8Array) {
@@ -86,8 +96,21 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
               strokeWidth: strokeWidth, // Use sanitized width for rendering style
               rotation: 0
           } as CanvasElement;
-      })
-    ];
+    });
+
+    // Merge fetched strokes with existing elements (preserving unsaved changes)
+    const elementMap = new Map<string, CanvasElement>();
+    fetchedElements.forEach(e => elementMap.set(e.id, e));
+    
+    // Overlay existing elements if they are newer (pending write) or not in fetched (newly created)
+    const existingElements = get().elements.filter(e => e.type !== 'stroke' || e.pageId === pageId);
+    existingElements.forEach(e => {
+         if (e.type !== 'stroke' || pendingWrites.has(e.id) || !elementMap.has(e.id)) {
+             elementMap.set(e.id, e);
+         }
+    });
+
+    const loadedElements = Array.from(elementMap.values());
 
     // Initialize spatial index with loaded strokes
     spatialIndex.initialize(loadedElements.filter(e => e.type === 'stroke') as StrokeElement[]);

@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { supabase } from "@/sync/supabase";
-import type { Table } from "dexie";
+import Dexie, { type Table } from "dexie";
 
 // Map Dexie table names to Supabase table names
 const TABLE_MAPPING: Record<string, string> = {
@@ -67,7 +67,26 @@ class SyncService {
         };
       });
 
-      table.hook("deleting", function (primKey: any, _obj: any, _transaction: any) {
+      table.hook("deleting", function (primKey: any, _obj: any, transaction: any) {
+        // Add to pending deletes to ensure it persists if offline
+        // Must use ignoreTransaction because the current transaction only covers the table being deleted
+        if (tableName !== "appState") {
+           // Use the transaction object if available, or fall back to db.transaction
+           // Actually, for Dexie hooks, we can't easily start a new transaction on a different table 
+           // if the current one is exclusive.
+           // But 'pendingDeletes' is a separate table.
+           // The error "Cannot read properties of undefined (reading 'global')" suggests Dexie might be imported incorrectly or context issue.
+           
+           // Let's try a different approach: schedule the add for next tick
+           setTimeout(() => {
+               db.table("pendingDeletes").add({ 
+                   tableName, 
+                   recordId: primKey, 
+                   date: Date.now() 
+               }).catch(e => console.error("Failed to add to pendingDeletes:", e));
+           }, 0);
+        }
+
         // @ts-ignore
         this.onsuccess = function () {
           if (self.isSyncing || !self.userId) return;
@@ -88,6 +107,10 @@ class SyncService {
           return;
         }
         await supabase.from(supabaseTableName).delete().match({ id: data.id });
+        
+        // Remove from pendingDeletes if successful
+        // @ts-ignore
+        await db.table("pendingDeletes").where({ tableName: dexieTableName, recordId: data.id }).delete();
       } else {
         const mappedData = await this.mapToSupabase(dexieTableName, { ...data, userId: this.userId });
         
@@ -375,6 +398,25 @@ class SyncService {
     console.log("Starting full push...");
 
     try {
+      // Process pending deletes first
+      // @ts-ignore
+      const pendingDeletes = await db.table("pendingDeletes").toArray();
+      if (pendingDeletes.length > 0) {
+          console.log(`Processing ${pendingDeletes.length} pending deletes...`);
+          for (const item of pendingDeletes) {
+              const supabaseTableName = TABLE_MAPPING[item.tableName];
+              if (!supabaseTableName) continue;
+              
+              const { error } = await supabase.from(supabaseTableName).delete().match({ id: item.recordId });
+              if (!error) {
+                  // @ts-ignore
+                  await db.table("pendingDeletes").delete(item.id);
+              } else {
+                  console.error(`Failed to push pending delete for ${item.tableName}:${item.recordId}`, error);
+              }
+          }
+      }
+
       const tables = Object.keys(TABLE_MAPPING);
 
       for (const dexieTableName of tables) {
@@ -412,14 +454,51 @@ class SyncService {
         }
         
         // Chunking with smaller batches for heavy tables
-        const chunkSize = (dexieTableName === 'strokes' || dexieTableName === 'canvasElements') ? 20 : 50;
+        // Reduce strokes chunk size to 5 to avoid "Failed to fetch" (payload too large)
+        const chunkSize = (dexieTableName === 'strokes') ? 5 : (dexieTableName === 'canvasElements' ? 10 : 50);
         
         for (let i = 0; i < allItems.length; i += chunkSize) {
             const chunk = allItems.slice(i, i + chunkSize);
             const mappedItems = await Promise.all(chunk.map(item => this.mapToSupabase(dexieTableName, { ...item, userId: this.userId })));
             
-            const { error } = await supabase.from(supabaseTableName).upsert(mappedItems);
-            if (error) console.error(`Failed to push chunk to ${supabaseTableName}:`, error);
+            // Retry logic for transient errors or large payloads
+            let attempts = 0;
+            const maxAttempts = 3;
+            let success = false;
+
+            while (attempts < maxAttempts && !success) {
+                try {
+                    const { error } = await supabase.from(supabaseTableName).upsert(mappedItems);
+                    if (error) {
+                        // Handle Foreign Key Violation (23503)
+                        // This means we are trying to push a child record (e.g. stroke) whose parent (page) 
+                        // does not exist on the server.
+                        if (error.code === '23503') {
+                            console.warn(`Foreign key violation for ${dexieTableName}. Removing orphan records locally.`);
+                            // We should delete these local records because they are orphans
+                            const idsToDelete = chunk.map(c => c.id);
+                            // @ts-ignore
+                            await db.table(dexieTableName).bulkDelete(idsToDelete);
+                            success = true; // Treat as handled
+                            continue;
+                        }
+
+                        console.error(`Failed to push chunk to ${supabaseTableName} (attempt ${attempts + 1}):`, error);
+                        attempts++;
+                        if (attempts < maxAttempts) await new Promise(r => setTimeout(r, 1000 * attempts)); // Backoff
+                    } else {
+                        success = true;
+                    }
+                } catch (e) {
+                     console.error(`Exception pushing chunk to ${supabaseTableName} (attempt ${attempts + 1}):`, e);
+                     attempts++;
+                     if (attempts < maxAttempts) await new Promise(r => setTimeout(r, 1000 * attempts));
+                }
+            }
+            
+            if (!success) {
+                console.error(`Permanently failed to push chunk of ${chunk.length} items to ${supabaseTableName}`);
+            }
         }
         console.log(`Pushed ${allItems.length} records for ${dexieTableName}`);
       }
@@ -436,6 +515,11 @@ class SyncService {
     console.log("Starting full sync...");
 
     try {
+      // Get pending deletes to filter incoming data
+      // @ts-ignore
+      const pendingDeletes = await db.table("pendingDeletes").toArray();
+      const pendingDeleteMap = new Set(pendingDeletes.map((p: any) => `${p.tableName}:${p.recordId}`));
+
       const tables = Object.keys(TABLE_MAPPING);
 
       for (const dexieTableName of tables) {
@@ -461,7 +545,10 @@ class SyncService {
             }
 
             if (data && data.length > 0) {
-                allData = [...allData, ...data];
+                // Filter out pending deletes
+                const validData = data.filter(item => !pendingDeleteMap.has(`${dexieTableName}:${item.id}`));
+                allData = [...allData, ...validData];
+                
                 if (data.length < pageSize) {
                     hasMore = false;
                 } else {
