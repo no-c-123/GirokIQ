@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { CanvasElement, StrokeElement } from "@/elements/types";
 import { db } from "@/db";
 import { spatialIndex } from "@/spatial/SpatialIndex";
+import { syncService } from "@/sync/sync";
 
 // Persistence debounce configuration
 const DEBOUNCE_MS = 1000;
@@ -123,8 +124,10 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   addElement: (element) => {
-    if (element.type === 'stroke') {
-      void db.strokes.put(element as any);
+  if (element.type === 'stroke') {
+      void db.strokes.put(element as any).then(() => {
+        syncService.queuePush("strokes", element);
+      });
       spatialIndex.insert(element as StrokeElement);
     }
     set((state) => ({ elements: [...state.elements, element] }));
@@ -229,12 +232,13 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   removeElement: (id) => {
-    void db.strokes.delete(id);
-    spatialIndex.remove(id);
-    set((state) => ({
-      elements: state.elements.filter((el) => el.id !== id),
-    }));
-  },
+  const now = Date.now();
+  void db.strokes.update(id, { deleted: true, updatedAt: now });
+  spatialIndex.remove(id);
+  set((state) => ({
+    elements: state.elements.filter((el) => el.id !== id),
+  }));
+},
 
   setElements: (elements) => set({ elements }),
 

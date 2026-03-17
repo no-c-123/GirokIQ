@@ -85,11 +85,11 @@ export function useKeyboardShortcuts() {
       action: () => setTool("text"),
     },
     {
-      id: "tool-lasso",
+      id: "tool-select",
       keys: ["v"],
-      description: "Lasso Tool",
+      description: "Select Tool",
       category: "Tools",
-      action: () => setTool("lasso"),
+      action: () => setTool("select"),
     },
   ];
 

@@ -10,7 +10,7 @@ import { useUIStore } from "@/stores/useUIStore";
 import { useBlockStore } from "@/stores/useBlockStore";
 import { useHistoryStore } from "@/history/useHistoryStore";
 import { useAppStore } from "@/store/useAppStore";
-import { DrawingLayer, getPathData } from "@/core/layers/DrawingLayer";
+import { DrawingLayer } from "@/core/layers/DrawingLayer";
 import { GridLayer } from "@/core/layers/GridLayer";
 import { ImageLayer } from "@/core/layers/ImageLayer";
 import { SelectionLayer } from "@/core/layers/SelectionLayer";
@@ -200,38 +200,7 @@ export default function CanvasArea({
         enabled: useUIStore((s) => s.shapeRecognitionEnabled)
     });
 
-  const getSelectionBBox = useCallback(() => {
-    if (selectedIds.length === 0) return null;
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    
-    // Check strokes
-    for (const id of selectedIds) {
-      const s = strokes.find(st => st.id === id);
-      if (s) {
-        for (let i = 0; i < s.points.length; i += 2) {
-          minX = Math.min(minX, s.points[i]);
-          minY = Math.min(minY, s.points[i+1]);
-          maxX = Math.max(maxX, s.points[i]);
-          maxY = Math.max(maxY, s.points[i+1]);
-        }
-      }
-    }
-    
-    // Check blocks
-    const blocks = useBlockStore.getState().blocks;
-    for (const id of selectedIds) {
-      const b = blocks.find(bl => bl.id === id);
-      if (b) {
-        minX = Math.min(minX, b.x);
-        minY = Math.min(minY, b.y);
-        maxX = Math.max(maxX, b.x + (b.width || 400));
-        maxY = Math.max(maxY, b.y + 24);
-      }
-    }
-    
-    if (minX === Infinity) return null;
-    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
-  }, [selectedIds, strokes]); // Memoize based on selected IDs and strokes
+
 
 
 

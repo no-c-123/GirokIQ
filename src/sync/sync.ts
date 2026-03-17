@@ -1,626 +1,247 @@
 import { db } from "@/db";
 import { supabase } from "@/sync/supabase";
-import { type Table } from "dexie";
 
-// Map Dexie table names to Supabase table names
-const TABLE_MAPPING: Record<string, string> = {
-  folders: "folders",
-  notebooks: "notebooks",
-  pages: "pages",
-  // blocks: "blocks", // Removed in v4
-  strokes: "strokes",
-  canvasElements: "canvas_elements",
-  appState: "app_state",
-};
-
-
-const SYNC_ENABLED = true;
+const DEVICE_ID = (() => {
+  let id = localStorage.getItem("device_id");
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem("device_id", id);
+  }
+  return id;
+})();
 
 class SyncService {
-  private isSyncing = false;
   private userId: string | null = null;
-
-  constructor() {
-    if (SYNC_ENABLED) {
-      this.setupHooks();
-    }
-  }
+  private realtimeChannel: any = null;
+  private pushQueue: Map<string, { table: string; record: any }> = new Map();
+  private flushTimeout: ReturnType<typeof setTimeout> | null = null;
 
   setUserId(id: string | null) {
     this.userId = id;
-    if (id && SYNC_ENABLED) {
-      this.syncAll();
+    if (id) {
+      this.initialSync();
+      this.subscribeRealtime();
+    } else {
+      this.realtimeChannel?.unsubscribe();
     }
   }
 
-  async syncAll() {
-    if (!this.userId || !SYNC_ENABLED) return;
-    // Pull first to get any remote changes
-    await this.pullAll();
-    // Then push any local changes
-    await this.pushAll();
+  // Called when local DB changes — queue the record for push
+  queuePush(table: string, record: any) {
+    if (!this.userId) return;
+    // Keyed by table:id so rapid updates to same record collapse into one push
+    this.pushQueue.set(`${table}:${record.id}`, { table, record });
+    if (this.flushTimeout) clearTimeout(this.flushTimeout);
+    this.flushTimeout = setTimeout(() => this.flushQueue(), 500);
   }
 
-  private setupHooks() {
-    const tables = Object.keys(TABLE_MAPPING);
-    const self = this;
+  private async flushQueue() {
+    if (!this.userId || this.pushQueue.size === 0) return;
+    const batch = Array.from(this.pushQueue.values());
+    this.pushQueue.clear();
 
-    tables.forEach((tableName) => {
-      // @ts-ignore
-      const table = db[tableName] as Table<any, any>;
+    // Group by table
+    const byTable = new Map<string, any[]>();
+    for (const { table, record } of batch) {
+      if (!byTable.has(table)) byTable.set(table, []);
+      byTable.get(table)!.push(record);
+    }
 
-      if (!table) return;
-
-      table.hook("creating", function (_primKey: any, obj: any, _transaction: any) {
-        // @ts-ignore
-        this.onsuccess = function (resultKey: any) {
-          if (self.isSyncing || !self.userId) return;
-          self.pushChange(tableName, "INSERT", { ...obj, id: resultKey });
-        };
+    for (const [table, records] of byTable) {
+      const mapped = records.map(r => this.toSupabase(table, r));
+      const { error } = await supabase.from(table).upsert(mapped, {
+        onConflict: "id",
+        ignoreDuplicates: false
       });
-
-      table.hook("updating", function (mods: any, primKey: any, obj: any, _transaction: any) {
-        this.onsuccess = function (_updatedKey: any) {
-          if (self.isSyncing || !self.userId) return;
-          const finalObj = { ...obj, ...mods, id: primKey };
-          self.pushChange(tableName, "UPDATE", finalObj);
-        };
-      });
-
-      table.hook("deleting", function (primKey: any, _obj: any, _transaction: any) {
-        // Add to pending deletes to ensure it persists if offline
-        // Must use ignoreTransaction because the current transaction only covers the table being deleted
-        if (tableName !== "appState") {
-           // Use the transaction object if available, or fall back to db.transaction
-           // Actually, for Dexie hooks, we can't easily start a new transaction on a different table 
-           // if the current one is exclusive.
-           // But 'pendingDeletes' is a separate table.
-           // The error "Cannot read properties of undefined (reading 'global')" suggests Dexie might be imported incorrectly or context issue.
-           
-           // Let's try a different approach: schedule the add for next tick
-           setTimeout(() => {
-               db.table("pendingDeletes").add({ 
-                   tableName, 
-                   recordId: primKey, 
-                   date: Date.now() 
-               }).catch(e => console.error("Failed to add to pendingDeletes:", e));
-           }, 0);
-        }
-
-        // @ts-ignore
-        this.onsuccess = function () {
-          if (self.isSyncing || !self.userId) return;
-          self.pushChange(tableName, "DELETE", { id: primKey });
-        };
-      });
-    });
+      if (error) {
+        console.error(`Sync push failed for ${table}:`, error);
+        // Re-queue on failure
+        records.forEach(r => this.pushQueue.set(`${table}:${r.id}`, { table, record: r }));
+      }
+    }
   }
 
-  private async pushChange(dexieTableName: string, type: "INSERT" | "UPDATE" | "DELETE", data: any) {
+  // Only push records newer than their last syncedAt
+  private async initialSync() {
+    if (!this.userId) return;
+    await this.pull();
+    await this.pushUnsyncedLocal();
+  }
+
+  // Pull only records changed since last pull
+  private async pull() {
     if (!this.userId) return;
 
-    if (dexieTableName !== "appState" && data && data.id) {
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        if (!uuidRegex.test(data.id)) {
-            console.warn(`Skipping pushChange for invalid UUID: ${data.id} in ${dexieTableName}`);
-            if (type !== "DELETE") {
-                // Try to clean it up locally
-                // @ts-ignore
-                await db.table(dexieTableName).delete(data.id).catch(() => {});
-            }
-            return;
-        }
-    }
+    const tables: Array<{ dexie: string; supabase: string }> = [
+      { dexie: "strokes", supabase: "strokes" },
+      { dexie: "canvasElements", supabase: "canvas_elements" },
+      { dexie: "pages", supabase: "pages" },
+      { dexie: "folders", supabase: "folders" },
+      { dexie: "notebooks", supabase: "notebooks" },
+    ];
 
-    const supabaseTableName = TABLE_MAPPING[dexieTableName];
-    
-    try {
-      if (type === "DELETE") {
-        if (dexieTableName === "appState") {
-          return;
-        }
-        const { error } = await supabase.from(supabaseTableName).delete().match({ id: data.id });
-        
-        if (error && error.code !== '22P02') {
-            throw error;
-        }
-        
-        // Remove from pendingDeletes if successful or invalid UUID
-        // @ts-ignore
-        await db.table("pendingDeletes").where({ tableName: dexieTableName, recordId: data.id }).delete();
-      } else {
-        const mappedData = await this.mapToSupabase(dexieTableName, { ...data, userId: this.userId });
-        
-        // Ensure points are stringified for bytea storage if needed
-        if (dexieTableName === "strokes" && Array.isArray(mappedData.points)) {
-            // If the column is bytea, we should probably send it as a Buffer or Uint8Array?
-            // Or Supabase client handles it?
-            // If we send an array of numbers to a bytea column, it might fail or be weird.
-            // But if we send a string, it might work if it's hex encoded.
-            // Based on the log \x5b31..., it seems like it's stored as the ASCII string of the JSON array.
-            // i.e. "[153, 200...]" -> hex encoded.
-            
-            // So we should JSON.stringify it?
-            // Actually, Supabase/Postgrest usually handles JSON -> bytea conversion if configured?
-            // But let's be explicit to match the read format.
-            // If we send the array directly, Supabase client might send it as JSON.
-            // Let's try sending it as a string first.
-            // mappedData.points = JSON.stringify(mappedData.points); 
-            // Wait, no. If we send a string to a bytea column, it expects hex format starting with \x.
-            // If we send JSON, it might work if the column is JSONB.
-            // The logs suggest it IS a bytea column storing JSON text.
-            
-            // Let's leave it as array for now, assuming Supabase client handles serialization.
-            // If push fails, we'll see.
-        }
-        
-        // Special handling for appState partial updates
-        if (dexieTableName === "appState") {
-           // We need to upsert into the user's single row
-           // mappedData will be a partial object like { user_id: ..., last_opened_page: ... }
-           // We must ensure we don't overwrite other columns with null if they are missing
-           // But supabase .upsert() handles partials if we don't specify all columns? 
-           // Yes, upsert matches on PK (user_id) and updates provided columns.
-           
-           // However, if we are updating 'settings' or 'sidebarVisible' which go into 'ui_state',
-           // we need to be careful not to overwrite the entire 'ui_state' jsonb if we only have a part of it.
-           // For now, let's assume mapToSupabase handles the structure correctly.
-           
-           // Issue: if mappedData.ui_state is just { sidebarVisible: true }, and DB has { settings: {...} },
-           // a standard SQL UPDATE or Upsert might replace the whole JSONB column.
-           // Supabase/Postgres requires jsonb_set or merging for deep updates.
-           // BUT, if we assume we just replace the top-level keys in ui_state, we might need to fetch first?
-           // OR we can rely on a stored procedure or just risk it for now if we don't have deep merging requirements yet.
-           // Actually, let's try to fetch the current ui_state if we are touching it.
-           
-           if (mappedData.ui_state) {
-               const { data: current } = await supabase
-                 .from(supabaseTableName)
-                 .select('ui_state')
-                 .eq('user_id', this.userId)
-                 .single();
-                 
-               if (current && current.ui_state) {
-                   mappedData.ui_state = { ...current.ui_state, ...mappedData.ui_state };
-               }
-           }
-        }
+    for (const { dexie: dexieTable, supabase: sbTable } of tables) {
+      // Get the last time we pulled this table
+      const cursor = await db.appState.get(`sync_cursor_${dexieTable}`);
+      const since = cursor?.value ?? new Date(0).toISOString();
 
-        // Upsert is safer
-        const { error } = await supabase.from(supabaseTableName).upsert(mappedData);
-        if (error) throw error;
+      const { data, error } = await supabase
+        .from(sbTable)
+        .select("*")
+        .eq("user_id", this.userId)
+        .gt("updated_at", since)
+        .order("updated_at", { ascending: true });
+
+      if (error || !data) continue;
+
+      for (const row of data) {
+        const local = await (db as any)[dexieTable].get(row.id);
+        const remoteUpdated = new Date(row.updated_at).getTime();
+        const localUpdated = local?.updatedAt ?? 0;
+
+        if (row.deleted) {
+          // Remote deleted — remove locally if it exists
+          await (db as any)[dexieTable].delete(row.id);
+        } else if (!local || remoteUpdated > localUpdated) {
+          // Remote is newer — take remote
+          const mapped = this.fromSupabase(dexieTable, row);
+          await (db as any)[dexieTable].put(mapped);
+        }
+        // If local is newer (localUpdated > remoteUpdated), keep local — it'll push in flushQueue
       }
-    } catch (error) {
-      console.error(`Failed to push change to ${supabaseTableName}:`, error);
+
+      // Update cursor to the latest updated_at we received
+      if (data.length > 0) {
+        const latest = data[data.length - 1].updated_at;
+        await db.appState.put({ key: `sync_cursor_${dexieTable}`, value: latest, updatedAt: Date.now() });
+      }
     }
   }
 
-  private async blobToBase64(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  }
-
-  private async mapToSupabase(dexieTableName: string, data: any) {
-    const common = {
-      id: data.id,
-      user_id: data.userId || this.userId, // Use provided userId or fallback to session
-      created_at: data.createdAt ? new Date(data.createdAt).toISOString() : undefined,
-      updated_at: data.updatedAt ? new Date(data.updatedAt).toISOString() : undefined,
-    };
-
-    // Remove undefined values
-    const clean = (obj: any) => {
-      Object.keys(obj).forEach(key => obj[key] === undefined && delete obj[key]);
-      return obj;
-    };
-    
-    // Debug
-    // if (dexieTableName === 'strokes') {
-    //     console.log(`[Sync] Mapping stroke to supabase. Points type: ${typeof data.points}, isArray: ${Array.isArray(data.points)}`);
-    // }
-
-    switch (dexieTableName) {
-      case "folders":
-        return clean({ ...common, parent_id: data.parentId, name: data.name });
-      case "notebooks":
-        return clean({ ...common, folder_id: data.folderId, name: data.name });
-      case "pages":
-        return clean({ ...common, notebook_id: data.notebookId, title: data.title, type: data.type, settings: data.settings });
-      case "strokes":
-        return clean({
-          ...common,
-          page_id: data.pageId,
-          points: data.points, // Note: Should be binary/bytea if possible, but keeping as is for now if compatible
-          color: data.color,
-          width: data.strokeWidth || data.width, // Prefer strokeWidth
-        });
-      case "canvasElements":
-        // Handle Blob in data field for images
-        let elementData = { ...data.data };
-        if (elementData.blob && elementData.blob instanceof Blob) {
-            try {
-                const base64 = await this.blobToBase64(elementData.blob);
-                elementData.url = base64; // Use url field for storage
-                delete elementData.blob; // Don't sync blob
-            } catch (e) {
-                console.error("Failed to convert blob to base64 for sync", e);
-            }
-        }
-
-        return clean({
-          ...common,
-          page_id: data.pageId,
-          type: data.type,
-          x: data.x,
-          y: data.y,
-          width: data.width,
-          height: data.height,
-          rotation: data.rotation,
-          z_index: data.zIndex,
-          data: elementData,
-        });
-      case "appState":
-        // Map local key-value to remote columns
-        // data = { key: "activePageId", value: "...", updatedAt: ... }
-        
-        const mappedState: any = {
-            user_id: common.user_id,
-            updated_at: common.updated_at
-        };
-
-        if (data.key === "activePageId") {
-            mappedState.last_opened_page = data.value;
-        } else if (data.key === "settings") {
-            mappedState.ui_state = { settings: data.value };
-        } else if (data.key === "sidebarVisible") {
-            mappedState.ui_state = { sidebarVisible: data.value };
-        } else {
-            // Other keys go into ui_state
-            mappedState.ui_state = { [data.key]: data.value };
-        }
-
-        return clean(mappedState);
-      default:
-        return data;
-    }
-  }
-
-  private mapFromSupabase(dexieTableName: string, data: any) {
-    // Basic mapping
-    const common = {
-      id: data.id,
-      userId: data.user_id,
-      createdAt: data.created_at ? new Date(data.created_at).getTime() : undefined,
-      updatedAt: data.updated_at ? new Date(data.updated_at).getTime() : undefined,
-    };
-    
-    // Debug
-    // if (dexieTableName === 'strokes') {
-    //     console.log(`[Sync] Mapping stroke from supabase. Points:`, data.points);
-    // }
-
-    switch (dexieTableName) {
-      case "folders":
-        return { ...common, parentId: data.parent_id, name: data.name };
-      case "notebooks":
-        return { ...common, folderId: data.folder_id, name: data.name };
-      case "pages":
-        return { ...common, notebookId: data.notebook_id, title: data.title, type: data.type, settings: data.settings };
-      case "strokes":
-        // Ensure points is a valid array of numbers
-        let points = data.points;
-        if (typeof points === 'string') {
-            // Check if it's a hex string (Postgres bytea)
-            if (points.startsWith('\\x')) {
-                // Decode bytea hex string
-                // \x000102... -> Uint8Array -> number[]
-                // This is a simplified decoding for demonstration. 
-                // In reality, bytea is binary. 
-                // If points were stored as binary, we need to know the encoding.
-                // Assuming points were JSON stringified then stored as text/bytea?
-                // Or stored as raw bytes?
-                
-                // If the data came from Supabase client for a 'bytea' column, it might be a hex string.
-                // But typically for 'jsonb' or 'text' it's a string.
-                // The logs show: \x5b313533... which is hex for "[153..." (JSON string)
-                
-                // Let's try to parse the hex as utf8 string
-                try {
-                    const hex = points.substring(2);
-                    let str = '';
-                    for (let i = 0; i < hex.length; i += 2) {
-                        str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
-                    }
-                    points = JSON.parse(str);
-                } catch (e) {
-                    console.error("Failed to parse bytea points:", e);
-                    points = [];
-                }
-            } else {
-                 try {
-                    points = JSON.parse(points);
-                 } catch (e) {
-                    console.error("Failed to parse points string:", e);
-                    points = [];
-                 }
-            }
-        }
-        
-        return {
-          ...common,
-          pageId: data.page_id,
-          points: Array.isArray(points) ? points : [],
-          color: data.color,
-          width: 0, // Bounding box width - not stored in DB stroke row
-          height: 0, // Bounding box height
-          strokeWidth: data.width, // Map DB width back to strokeWidth
-        };
-      case "canvasElements":
-        return {
-          ...common,
-          pageId: data.page_id,
-          type: data.type,
-          x: data.x,
-          y: data.y,
-          width: data.width,
-          height: data.height,
-          rotation: data.rotation,
-          zIndex: data.z_index,
-          data: data.data,
-        };
-      case "appState":
-        // This is tricky because pullAll expects one object, but we might need to return multiple.
-        // However, mapFromSupabase is called inside a loop in pullAll.
-        // For appState, pullAll fetches a single row.
-        // We should return an array of objects here, but mapFromSupabase signature assumes one object.
-        // Let's modify pullAll to handle array returns or special case appState.
-        
-        // For now, let's return a special object that contains the expanded state
-        // and handle it in pullAll
-        const result: any[] = [];
-         const updatedAt = common.updatedAt || Date.now();
- 
-         if (data.last_opened_page !== undefined) {
-             result.push({ key: "activePageId", value: data.last_opened_page, updatedAt });
-         }
-         
-         if (data.ui_state) {
-             if (data.ui_state.settings) {
-                 result.push({ key: "settings", value: data.ui_state.settings, updatedAt });
-             }
-             if (data.ui_state.sidebarVisible !== undefined) {
-                 result.push({ key: "sidebarVisible", value: data.ui_state.sidebarVisible, updatedAt });
-             }
-             // Map other keys
-             Object.keys(data.ui_state).forEach(k => {
-                 if (k !== "settings" && k !== "sidebarVisible") {
-                     result.push({ key: k, value: data.ui_state[k], updatedAt });
-                 }
-             });
-         }
-         
-         return result;
-      default:
-        return data;
-    }
-  }
-
-  async pushAll() {
+  // Push local records that haven't been confirmed synced
+  private async pushUnsyncedLocal() {
     if (!this.userId) return;
-    this.isSyncing = true;
-    // console.log("Starting full push...");
 
-    try {
-      // Process pending deletes first
-      // @ts-ignore
-      const pendingDeletes = await db.table("pendingDeletes").toArray();
-      if (pendingDeletes.length > 0) {
-          // console.log(`Processing ${pendingDeletes.length} pending deletes...`);
-          for (const item of pendingDeletes) {
-              const supabaseTableName = TABLE_MAPPING[item.tableName];
-              if (!supabaseTableName) continue;
-              
-              const { error } = await supabase.from(supabaseTableName).delete().match({ id: item.recordId });
-              if (!error || error.code === '22P02') {
-                  // If successful or if it's an invalid UUID error (which will never succeed), remove from pending deletes
-                  // @ts-ignore
-                  await db.table("pendingDeletes").delete(item.id);
-              } else {
-                  console.error(`Failed to push pending delete for ${item.tableName}:${item.recordId}`, error);
-              }
-          }
+    const tables = ["strokes", "canvasElements", "pages", "folders", "notebooks"] as const;
+
+    for (const table of tables) {
+      const sbTable = table === "canvasElements" ? "canvas_elements" : table;
+      // Records where syncedAt is missing or older than updatedAt
+      const all = await (db as any)[table].toArray();
+      const unsynced = all.filter((r: any) => !r.syncedAt || r.syncedAt < r.updatedAt);
+      
+      if (unsynced.length === 0) continue;
+
+      const chunks = chunk(unsynced, 25);
+      for (const c of chunks) {
+        const mapped = c.map((r: any) => this.toSupabase(sbTable, r));
+        const { error } = await supabase.from(sbTable).upsert(mapped, { onConflict: "id" });
+        if (!error) {
+          // Mark as synced
+          const now = Date.now();
+          await (db as any)[table].bulkPut(c.map((r: any) => ({ ...r, syncedAt: now })));
+        }
       }
-
-      const tables = Object.keys(TABLE_MAPPING);
-
-      for (const dexieTableName of tables) {
-        // @ts-ignore
-        const table = db[dexieTableName] as Table<any, any>;
-        let allItems = await table.toArray();
-
-        if (allItems.length === 0) continue;
-
-        const supabaseTableName = TABLE_MAPPING[dexieTableName];
-        
-        if (dexieTableName === 'appState') {
-            // Special handling: merge all rows into one to avoid "ON CONFLICT" errors
-            // because multiple local rows map to the single remote user row
-            const mappedItems = await Promise.all(allItems.map(item => this.mapToSupabase(dexieTableName, { ...item, userId: this.userId })));
-            
-            const mergedItem = mappedItems.reduce((acc, curr) => {
-                // Take the latest updated_at
-                const latestUpdate = (!acc.updated_at || (curr.updated_at && new Date(curr.updated_at) > new Date(acc.updated_at))) 
-                    ? curr.updated_at 
-                    : acc.updated_at;
-
-                return {
-                    ...acc,
-                    ...curr,
-                    updated_at: latestUpdate,
-                    ui_state: { ...(acc.ui_state || {}), ...(curr.ui_state || {}) }
-                };
-            }, {});
-            
-            const { error } = await supabase.from(supabaseTableName).upsert(mergedItem);
-            if (error) console.error(`Failed to push merged appState:`, error);
-            // console.log(`Pushed merged appState record`);
-            continue;
-        }
-
-        // Clean up any invalid UUIDs that shouldn't have been stored locally
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        const invalidItems = allItems.filter(item => item.id && !uuidRegex.test(item.id));
-        if (invalidItems.length > 0) {
-            const invalidIds = invalidItems.map(i => i.id);
-            console.warn(`Found invalid UUIDs in ${dexieTableName}, deleting locally:`, invalidIds);
-            // @ts-ignore
-            await db.table(dexieTableName).bulkDelete(invalidIds).catch(() => {});
-            allItems = allItems.filter(item => !item.id || uuidRegex.test(item.id));
-        }
-
-        if (allItems.length === 0) continue;
-        
-        // Chunking with smaller batches for heavy tables
-        // Reduce strokes chunk size to 5 to avoid "Failed to fetch" (payload too large)
-        const chunkSize = (dexieTableName === 'strokes') ? 5 : (dexieTableName === 'canvasElements' ? 10 : 50);
-        
-        for (let i = 0; i < allItems.length; i += chunkSize) {
-            const chunk = allItems.slice(i, i + chunkSize);
-            const mappedItems = await Promise.all(chunk.map(item => this.mapToSupabase(dexieTableName, { ...item, userId: this.userId })));
-            
-            // Retry logic for transient errors or large payloads
-            let attempts = 0;
-            const maxAttempts = 3;
-            let success = false;
-
-            while (attempts < maxAttempts && !success) {
-                try {
-                    const { error } = await supabase.from(supabaseTableName).upsert(mappedItems);
-                    if (error) {
-                        // Handle Foreign Key Violation (23503)
-                        // This means we are trying to push a child record (e.g. stroke) whose parent (page) 
-                        // does not exist on the server.
-                        if (error.code === '23503') {
-                            console.warn(`Foreign key violation for ${dexieTableName}. Removing orphan records locally.`);
-                            // We should delete these local records because they are orphans
-                            const idsToDelete = chunk.map(c => c.id);
-                            // @ts-ignore
-                            await db.table(dexieTableName).bulkDelete(idsToDelete);
-                            success = true; // Treat as handled
-                            continue;
-                        }
-                        
-                        // Handle Invalid Text Representation (22P02)
-                        // Should not happen with the regex filter above, but just in case
-                        if (error.code === '22P02') {
-                            console.warn(`Invalid input syntax for ${dexieTableName}. Removing bad records locally.`);
-                            const idsToDelete = chunk.map(c => c.id);
-                            // @ts-ignore
-                            await db.table(dexieTableName).bulkDelete(idsToDelete);
-                            success = true; // Treat as handled
-                            continue;
-                        }
-
-                        console.error(`Failed to push chunk to ${supabaseTableName} (attempt ${attempts + 1}):`, error);
-                        attempts++;
-                        if (attempts < maxAttempts) await new Promise(r => setTimeout(r, 1000 * attempts)); // Backoff
-                    } else {
-                        success = true;
-                    }
-                } catch (e) {
-                     console.error(`Exception pushing chunk to ${supabaseTableName} (attempt ${attempts + 1}):`, e);
-                     attempts++;
-                     if (attempts < maxAttempts) await new Promise(r => setTimeout(r, 1000 * attempts));
-                }
-            }
-            
-            if (!success) {
-                console.error(`Permanently failed to push chunk of ${chunk.length} items to ${supabaseTableName}`);
-            }
-        }
-        // console.log(`Pushed ${allItems.length} records for ${dexieTableName}`);
-      }
-    } catch (err) {
-      console.error("Push failed:", err);
-    } finally {
-      this.isSyncing = false;
     }
   }
 
-  async pullAll() {
+  // Subscribe to Supabase Realtime for live cross-device updates
+  private subscribeRealtime() {
     if (!this.userId) return;
-    this.isSyncing = true;
-    // console.log("Starting full sync...");
+    this.realtimeChannel?.unsubscribe();
 
-    try {
-      // Get pending deletes to filter incoming data
-      // @ts-ignore
-      const pendingDeletes = await db.table("pendingDeletes").toArray();
-      const pendingDeleteMap = new Set(pendingDeletes.map((p: any) => `${p.tableName}:${p.recordId}`));
+    this.realtimeChannel = supabase
+      .channel(`user-${this.userId}`)
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "strokes",
+        filter: `user_id=eq.${this.userId}`,
+      }, (payload) => this.handleRealtimeEvent("strokes", payload))
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "canvas_elements",
+        filter: `user_id=eq.${this.userId}`,
+      }, (payload) => this.handleRealtimeEvent("canvasElements", payload))
+      .subscribe();
+  }
 
-      const tables = Object.keys(TABLE_MAPPING);
+  private async handleRealtimeEvent(dexieTable: string, payload: any) {
+    // Ignore events originating from this device
+    if (payload.new?.device_id === DEVICE_ID) return;
 
-      for (const dexieTableName of tables) {
-        const supabaseTableName = TABLE_MAPPING[dexieTableName];
-        // @ts-ignore
-        const table = db[dexieTableName] as Table<any, any>;
+    const row = payload.new ?? payload.old;
+    if (!row) return;
 
-        let allData: any[] = [];
-        let page = 0;
-        const pageSize = 1000;
-        let hasMore = true;
-
-        while (hasMore) {
-            const { data, error } = await supabase
-                .from(supabaseTableName)
-                .select("*")
-                .range(page * pageSize, (page + 1) * pageSize - 1);
-
-            if (error) {
-                console.error(`Error pulling ${supabaseTableName}:`, error);
-                hasMore = false;
-                break;
-            }
-
-            if (data && data.length > 0) {
-                // Filter out pending deletes
-                const validData = data.filter(item => !pendingDeleteMap.has(`${dexieTableName}:${item.id}`));
-                allData = [...allData, ...validData];
-                
-                if (data.length < pageSize) {
-                    hasMore = false;
-                } else {
-                    page++;
-                }
-            } else {
-                hasMore = false;
-            }
-        }
-
-        if (allData.length > 0) {
-          if (dexieTableName === "appState") {
-              // Flatten the arrays returned by mapFromSupabase for appState
-              const dexieData = allData.flatMap((item) => this.mapFromSupabase(dexieTableName, item));
-              if (dexieData.length > 0) {
-                  await table.bulkPut(dexieData);
-              }
-          } else {
-              const dexieData = allData.map((item) => this.mapFromSupabase(dexieTableName, item));
-              await table.bulkPut(dexieData);
-          }
-          // console.log(`Synced ${allData.length} records for ${dexieTableName}`);
-        }
+    if (payload.eventType === "DELETE" || row.deleted) {
+      await (db as any)[dexieTable].delete(row.id);
+    } else {
+      const local = await (db as any)[dexieTable].get(row.id);
+      const remoteUpdated = new Date(row.updated_at).getTime();
+      if (!local || remoteUpdated > (local.updatedAt ?? 0)) {
+        await (db as any)[dexieTable].put(this.fromSupabase(dexieTable, row));
       }
-    } catch (err) {
-      console.error("Sync failed:", err);
-    } finally {
-      this.isSyncing = false;
     }
   }
+
+  private toSupabase(table: string, r: any): any {
+    const base = {
+      id: r.id,
+      user_id: this.userId,
+      device_id: DEVICE_ID,
+      created_at: r.createdAt ? new Date(r.createdAt).toISOString() : undefined,
+      updated_at: r.updatedAt ? new Date(r.updatedAt).toISOString() : new Date().toISOString(),
+      deleted: r.deleted ?? false,
+    };
+    switch (table) {
+      case "strokes": return { ...base, page_id: r.pageId, points: r.points, color: r.color, width: r.strokeWidth ?? r.width };
+      case "canvas_elements": return { ...base, page_id: r.pageId, type: r.type, x: r.x, y: r.y, width: r.width, height: r.height, rotation: r.rotation, data: r.data };
+      case "pages": return { ...base, notebook_id: r.notebookId, title: r.title, type: r.type, settings: r.settings };
+      case "folders": return { ...base, parent_id: r.parentId, name: r.name };
+      case "notebooks": return { ...base, folder_id: r.folderId, name: r.name };
+      default: return { ...base, ...r };
+    }
+  }
+
+  private fromSupabase(dexieTable: string, row: any): any {
+    const base = {
+      id: row.id,
+      userId: row.user_id,
+      createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+      updatedAt: row.updated_at ? new Date(row.updated_at).getTime() : Date.now(),
+      syncedAt: Date.now(),
+      deleted: row.deleted ?? false,
+    };
+    switch (dexieTable) {
+      case "strokes": return { ...base, pageId: row.page_id, points: parsePoints(row.points), color: row.color, strokeWidth: row.width, width: 0, height: 0 };
+      case "canvasElements": return { ...base, pageId: row.page_id, type: row.type, x: row.x, y: row.y, width: row.width, height: row.height, rotation: row.rotation, data: row.data };
+      case "pages": return { ...base, notebookId: row.notebook_id, title: row.title, type: row.type, settings: row.settings };
+      case "folders": return { ...base, parentId: row.parent_id, name: row.name };
+      case "notebooks": return { ...base, folderId: row.folder_id, name: row.name };
+      default: return { ...base, ...row };
+    }
+  }
+}
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+function parsePoints(points: any): number[] {
+  if (Array.isArray(points)) return points;
+  if (typeof points === "string") {
+    if (points.startsWith("\\x")) {
+      const hex = points.slice(2);
+      let str = "";
+      for (let i = 0; i < hex.length; i += 2) str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
+      try { return JSON.parse(str); } catch { return []; }
+    }
+    try { return JSON.parse(points); } catch { return []; }
+  }
+  return [];
 }
 
 export const syncService = new SyncService();

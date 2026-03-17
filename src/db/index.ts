@@ -16,6 +16,9 @@ export interface StrokeRow {
   shapeType?: string;
   originalPoints?: number[];
   createdAt: number;
+  updatedAt: number;
+  deleted?: boolean;
+  syncedAt?: number;
 }
 
 export interface AppStateRow {
@@ -146,6 +149,15 @@ export class AppDB extends Dexie {
         await tx.table("canvasElements").bulkAdd(updatedElements);
       }
     });
+    this.version(6).stores({
+      folders: "id, parentId, userId, createdAt, updatedAt, syncedAt",
+      notebooks: "id, folderId, userId, createdAt, updatedAt, syncedAt",
+      pages: "id, notebookId, userId, createdAt, updatedAt, syncedAt",
+      canvasElements: "id, pageId, userId, type, createdAt, updatedAt, syncedAt",
+      strokes: "id, pageId, userId, updatedAt, syncedAt",
+      appState: "key, updatedAt",
+      pendingDeletes: "++id, tableName, recordId"
+      });
   }
 }
 

@@ -10,14 +10,14 @@ export interface CanvasElement {
   rotation?: number;
   zIndex?: number;
   data: {
-    content?: string; // For text
-    url?: string; // For image
-    blob?: Blob; // Local blob for image
-    points?: number[]; // For stroke if stored here (though strokes table exists)
+    content?: string;
+    url?: string; 
+    blob?: Blob; 
+    points?: number[]; 
     color?: string;
-    // Add other properties as needed
     [key: string]: any;
   };
-  createdAt: number;
   updatedAt: number;
+  deleted?: boolean;
+  syncedAt?: number;
 }

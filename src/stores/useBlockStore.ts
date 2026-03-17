@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { generateId } from "@/utils";
 import { db } from "@/db";
+import { useAuthStore } from "@/store/useAuthStore";
 import type { CanvasElement } from "@/data/models/canvas";
 
 interface BlockState {
@@ -33,9 +34,7 @@ export const useBlockStore = create<BlockState>((set, get) => ({
   typingBlockId: null,
 
   addTextBlock: async (pageId, x, y) => {
-    // We need userId. For now, assume a default or fetch from somewhere.
-    // In a real scenario, this should come from auth store.
-    const userId = "00000000-0000-0000-0000-000000000000"; 
+    const userId = useAuthStore.getState().user?.id ?? "";
     
     const block: CanvasElement = {
       id: generateId(),
@@ -47,7 +46,8 @@ export const useBlockStore = create<BlockState>((set, get) => ({
       data: {
         content: "",
       },
-      createdAt: Date.now(),
+      deleted: false,
+      syncedAt: Date.now(),
       updatedAt: Date.now(),
     };
 
@@ -57,7 +57,7 @@ export const useBlockStore = create<BlockState>((set, get) => ({
   },
 
   addImageBlock: async (pageId, x, y, url, width, height) => {
-    const userId = "00000000-0000-0000-0000-000000000000";
+    const userId = useAuthStore.getState().user?.id ?? "";
     let blob: Blob | undefined;
     let finalUrl = url;
 
@@ -66,8 +66,6 @@ export const useBlockStore = create<BlockState>((set, get) => ({
         try {
             const res = await fetch(url);
             blob = await res.blob();
-            // We don't store the huge data URL in 'url' field if we have a blob
-            // But we keep it in the object for immediate display
         } catch (e) {
             console.error("Failed to convert data URL to blob", e);
         }
@@ -86,7 +84,8 @@ export const useBlockStore = create<BlockState>((set, get) => ({
         url: finalUrl,
         blob,
       },
-      createdAt: Date.now(),
+      deleted: false,
+      syncedAt: Date.now(), 
       updatedAt: Date.now(),
     };
 
@@ -147,13 +146,11 @@ export const useBlockStore = create<BlockState>((set, get) => ({
   },
 
   deleteBlock: async (id) => {
-    await db.canvasElements.delete(id);
-    set((state) => {
-      const nextBlocks = state.blocks.filter((b) => b.id !== id);
-      const nextSelected =
-        state.selectedBlockId === id ? null : state.selectedBlockId;
-      return { blocks: nextBlocks, selectedBlockId: nextSelected };
-    });
+    await db.canvasElements.update(id, { deleted: true, updatedAt: Date.now() });
+    set((state) => ({
+      blocks: state.blocks.filter((b) => b.id !== id),
+      selectedBlockId: state.selectedBlockId === id ? null : state.selectedBlockId,
+    }));
   },
 
   addExistingBlock: async (block) => {
