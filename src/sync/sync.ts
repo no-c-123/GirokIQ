@@ -99,6 +99,19 @@ class SyncService {
   private async pushChange(dexieTableName: string, type: "INSERT" | "UPDATE" | "DELETE", data: any) {
     if (!this.userId) return;
 
+    if (dexieTableName !== "appState" && data && data.id) {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(data.id)) {
+            console.warn(`Skipping pushChange for invalid UUID: ${data.id} in ${dexieTableName}`);
+            if (type !== "DELETE") {
+                // Try to clean it up locally
+                // @ts-ignore
+                await db.table(dexieTableName).delete(data.id).catch(() => {});
+            }
+            return;
+        }
+    }
+
     const supabaseTableName = TABLE_MAPPING[dexieTableName];
     
     try {
@@ -106,9 +119,13 @@ class SyncService {
         if (dexieTableName === "appState") {
           return;
         }
-        await supabase.from(supabaseTableName).delete().match({ id: data.id });
+        const { error } = await supabase.from(supabaseTableName).delete().match({ id: data.id });
         
-        // Remove from pendingDeletes if successful
+        if (error && error.code !== '22P02') {
+            throw error;
+        }
+        
+        // Remove from pendingDeletes if successful or invalid UUID
         // @ts-ignore
         await db.table("pendingDeletes").where({ tableName: dexieTableName, recordId: data.id }).delete();
       } else {
@@ -395,20 +412,21 @@ class SyncService {
   async pushAll() {
     if (!this.userId) return;
     this.isSyncing = true;
-    console.log("Starting full push...");
+    // console.log("Starting full push...");
 
     try {
       // Process pending deletes first
       // @ts-ignore
       const pendingDeletes = await db.table("pendingDeletes").toArray();
       if (pendingDeletes.length > 0) {
-          console.log(`Processing ${pendingDeletes.length} pending deletes...`);
+          // console.log(`Processing ${pendingDeletes.length} pending deletes...`);
           for (const item of pendingDeletes) {
               const supabaseTableName = TABLE_MAPPING[item.tableName];
               if (!supabaseTableName) continue;
               
               const { error } = await supabase.from(supabaseTableName).delete().match({ id: item.recordId });
-              if (!error) {
+              if (!error || error.code === '22P02') {
+                  // If successful or if it's an invalid UUID error (which will never succeed), remove from pending deletes
                   // @ts-ignore
                   await db.table("pendingDeletes").delete(item.id);
               } else {
@@ -422,7 +440,7 @@ class SyncService {
       for (const dexieTableName of tables) {
         // @ts-ignore
         const table = db[dexieTableName] as Table<any, any>;
-        const allItems = await table.toArray();
+        let allItems = await table.toArray();
 
         if (allItems.length === 0) continue;
 
@@ -449,9 +467,22 @@ class SyncService {
             
             const { error } = await supabase.from(supabaseTableName).upsert(mergedItem);
             if (error) console.error(`Failed to push merged appState:`, error);
-            console.log(`Pushed merged appState record`);
+            // console.log(`Pushed merged appState record`);
             continue;
         }
+
+        // Clean up any invalid UUIDs that shouldn't have been stored locally
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const invalidItems = allItems.filter(item => item.id && !uuidRegex.test(item.id));
+        if (invalidItems.length > 0) {
+            const invalidIds = invalidItems.map(i => i.id);
+            console.warn(`Found invalid UUIDs in ${dexieTableName}, deleting locally:`, invalidIds);
+            // @ts-ignore
+            await db.table(dexieTableName).bulkDelete(invalidIds).catch(() => {});
+            allItems = allItems.filter(item => !item.id || uuidRegex.test(item.id));
+        }
+
+        if (allItems.length === 0) continue;
         
         // Chunking with smaller batches for heavy tables
         // Reduce strokes chunk size to 5 to avoid "Failed to fetch" (payload too large)
@@ -482,6 +513,17 @@ class SyncService {
                             success = true; // Treat as handled
                             continue;
                         }
+                        
+                        // Handle Invalid Text Representation (22P02)
+                        // Should not happen with the regex filter above, but just in case
+                        if (error.code === '22P02') {
+                            console.warn(`Invalid input syntax for ${dexieTableName}. Removing bad records locally.`);
+                            const idsToDelete = chunk.map(c => c.id);
+                            // @ts-ignore
+                            await db.table(dexieTableName).bulkDelete(idsToDelete);
+                            success = true; // Treat as handled
+                            continue;
+                        }
 
                         console.error(`Failed to push chunk to ${supabaseTableName} (attempt ${attempts + 1}):`, error);
                         attempts++;
@@ -500,7 +542,7 @@ class SyncService {
                 console.error(`Permanently failed to push chunk of ${chunk.length} items to ${supabaseTableName}`);
             }
         }
-        console.log(`Pushed ${allItems.length} records for ${dexieTableName}`);
+        // console.log(`Pushed ${allItems.length} records for ${dexieTableName}`);
       }
     } catch (err) {
       console.error("Push failed:", err);
@@ -512,7 +554,7 @@ class SyncService {
   async pullAll() {
     if (!this.userId) return;
     this.isSyncing = true;
-    console.log("Starting full sync...");
+    // console.log("Starting full sync...");
 
     try {
       // Get pending deletes to filter incoming data
@@ -570,7 +612,7 @@ class SyncService {
               const dexieData = allData.map((item) => this.mapFromSupabase(dexieTableName, item));
               await table.bulkPut(dexieData);
           }
-          console.log(`Synced ${allData.length} records for ${dexieTableName}`);
+          // console.log(`Synced ${allData.length} records for ${dexieTableName}`);
         }
       }
     } catch (err) {

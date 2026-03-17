@@ -25,8 +25,8 @@ export interface StrokeElement extends BaseElement {
   type: "stroke";
   points: number[];
   color: string;
-  strokeWidth: number; // Changed from width to avoid conflict with BaseElement.width (bbox)
-  width: number; // Bounding box width
+  strokeWidth: number; 
+  width: number; 
   pressures?: number[];
   shapeType?: string; // "rectangle" | "circle" | "diamond" | "arrow" | "line" | "ellipse"
   originalPoints?: number[];
@@ -46,7 +46,7 @@ export interface TextElement extends BaseElement {
 
 export interface ImageElement extends BaseElement {
   type: "image";
-  content: string; // URL or base64
+  content: string; 
   blob?: Blob;
 }
 

@@ -1,4 +1,4 @@
-import { Layer, Line } from "react-konva";
+import { Layer, Line, Circle } from "react-konva";
 import { memo } from "react";
 
 export const GridLayer = memo(function GridLayer({
@@ -10,6 +10,7 @@ export const GridLayer = memo(function GridLayer({
   gridColor = "#ffffff",
   backgroundColor = "transparent",
   opacity = 0.12,
+  pattern = "squares",
 }: {
   width: number;
   height: number;
@@ -19,6 +20,7 @@ export const GridLayer = memo(function GridLayer({
   gridColor?: string;
   backgroundColor?: string;
   opacity?: number;
+  pattern?: "squares" | "lines" | "dots" | "none";
 }) {
   const startX = Math.floor(minX / gridSize) * gridSize;
   const startY = Math.floor(minY / gridSize) * gridSize;
@@ -35,7 +37,7 @@ export const GridLayer = memo(function GridLayer({
         closed
       />
 
-      {Array.from({ length: verticalLineCount + 1 }, (_, index) => {
+      {pattern === "squares" && Array.from({ length: verticalLineCount + 1 }, (_, index) => {
         const x = startX + index * gridSize;
         return (
           <Line
@@ -47,7 +49,7 @@ export const GridLayer = memo(function GridLayer({
         );
       })}
 
-      {Array.from({ length: horizontalLineCount + 1 }, (_, index) => {
+      {(pattern === "squares" || pattern === "lines") && Array.from({ length: horizontalLineCount + 1 }, (_, index) => {
         const y = startY + index * gridSize;
         return (
           <Line
@@ -57,6 +59,22 @@ export const GridLayer = memo(function GridLayer({
             strokeWidth={1}
           />
         );
+      })}
+
+      {pattern === "dots" && Array.from({ length: horizontalLineCount + 1 }, (_, yIndex) => {
+        const y = startY + yIndex * gridSize;
+        return Array.from({ length: verticalLineCount + 1 }, (_, xIndex) => {
+          const x = startX + xIndex * gridSize;
+          return (
+            <Circle
+              key={`d-${x}-${y}`}
+              x={x}
+              y={y}
+              radius={1.5}
+              fill={gridColor}
+            />
+          );
+        });
       })}
     </Layer>
   );

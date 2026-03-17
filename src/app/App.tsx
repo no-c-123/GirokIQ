@@ -127,7 +127,7 @@ export default function App() {
       settings: {
         size: "A4",
         orientation: "portrait",
-        grid: "dotted",
+        grid: "squares",
         zoom: 1,
       }
     };
@@ -156,7 +156,7 @@ export default function App() {
     return (
       <div className="h-screen w-screen bg-[var(--bg-app)] flex items-center justify-center text-[var(--text-secondary)]">
         <div className="animate-pulse flex flex-col items-center">
-          <img src="/Girok-logo-G.png" alt="GirokIQ" className="w-12 h-12 mb-4 animate-pulse object-contain" />
+          <img src="/girok-iq-logo.png" alt="GirokIQ" className="w-12 h-12 mb-4 animate-pulse object-contain" />
           <span className="text-sm tracking-widest uppercase">Loading GirokIQ...</span>
         </div>
       </div>

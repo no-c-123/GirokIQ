@@ -3,6 +3,7 @@ import type { StrokeElement } from "@/elements/types";
 import { useMemo, useRef, useEffect, memo, useState } from "react";
 import Konva from "konva";
 import { spatialIndex } from "@/spatial/SpatialIndex";
+import { useSelectionStore } from "@/stores/useSelectionStore";
 
 const TILE_SIZE = 1024;
 
@@ -110,17 +111,15 @@ export function getPathData(stroke: StrokeElement) {
 export function DrawingLayer({
   strokes,
   currentStroke,
-  selectedIds = [],
-  selectionOffset = { x: 0, y: 0 },
   viewport,
+  onNodeRef,
 }: {
   strokes: StrokeElement[];
   currentStroke: StrokeElement | null;
-  selectedIds?: string[];
-  selectionOffset?: { x: number; y: number };
   viewport?: Viewport;
+  onNodeRef?: (id: string, node: Konva.Node | null) => void;
 }) {
-  // Calculate visible tiles based on viewport
+  const selectedIds = useSelectionStore((s) => s.selectedIds);
   const visibleTileKeys = useMemo(() => {
     if (!viewport) return [];
     
@@ -155,16 +154,9 @@ export function DrawingLayer({
             height: TILE_SIZE
         });
         
-        if (found.length > 0) {
-            // console.log(`[Render] Tile ${key.x},${key.y} has ${found.length} strokes`);
-            // console.log(`[Render] First stroke in tile:`, found[0].points.slice(0, 4));
-        }
-
         // Deduplicate strokes that might cross tile boundaries if needed,
         // but here we just render them. React key handles uniqueness.
-        // Filter out selected strokes from the frozen tiles
-        const tileStrokes = found
-            .filter(stroke => !selectedIds.includes(stroke.id));
+        const tileStrokes = found;
         
         return (
             <Tile 
@@ -172,69 +164,19 @@ export function DrawingLayer({
                 x={tileX}
                 y={tileY}
                 strokes={tileStrokes}
+                selectedIds={selectedIds}
                 zoom={viewport?.zoom || 1}
+                onNodeRef={onNodeRef}
             />
         );
     });
-  }, [visibleTileKeys, strokes, selectedIds, viewport?.zoom]); 
-
-  // Render selected strokes separately (live, not cached)
-  const selectedStrokesLayer = useMemo(() => {
-    if (selectedIds.length === 0) return null;
-    
-    // Find the actual stroke objects for the selected IDs
-    const selectedStrokes = strokes.filter(s => selectedIds.includes(s.id));
-    
-    return (
-        <Group x={selectionOffset.x} y={selectionOffset.y}>
-            {selectedStrokes.map(stroke => {
-                const pathData = getPathData(stroke);
-                return (
-                  <Path
-                    key={stroke.id}
-                    data={pathData}
-                    stroke={stroke.color}
-                    strokeWidth={stroke.width}
-                    dash={stroke.strokeStyle === "dashed" ? [10, 10] : stroke.strokeStyle === "dotted" ? [5, 5] : undefined}
-                    opacity={stroke.opacity ? stroke.opacity / 100 : 1}
-                    fill={stroke.backgroundColor && stroke.backgroundColor !== "transparent" ? stroke.backgroundColor : undefined}
-                    lineCap="round"
-                    lineJoin="round"
-                    // Add a subtle shadow or effect to indicate selection if desired
-                    shadowColor="rgba(99, 102, 241, 0.5)"
-                    shadowBlur={5}
-                    perfectDrawEnabled={false}
-                    listening={false}
-                  />
-                );
-            })}
-        </Group>
-    );
-  }, [selectedIds, strokes, selectionOffset]);
+  }, [visibleTileKeys, strokes, selectedIds, viewport?.zoom, onNodeRef]); 
 
   // Current stroke path generation
   const currentStrokePath = useMemo(() => {
     if (!currentStroke) return null;
     const pathData = getPathData(currentStroke);
     
-    // Check if it's a lasso stroke (based on ID or some property we set)
-    const isLasso = currentStroke.id === "lasso-current";
-
-    if (isLasso) {
-        return (
-          <Path
-            data={pathData}
-            stroke="#6366f1" // Indigo-500
-            strokeWidth={2 / viewport!.zoom} // Scale invariant width
-            dash={[5 / viewport!.zoom, 5 / viewport!.zoom]} // Scale invariant dash
-            lineCap="round"
-            lineJoin="round"
-            perfectDrawEnabled={false}
-            listening={false}
-          />
-        );
-    }
-
     return (
       <Path
         data={pathData}
@@ -252,16 +194,30 @@ export function DrawingLayer({
   }, [currentStroke, viewport?.zoom]);
 
   return (
-    <Layer listening={false}>
+    <Layer listening={true}>
       {renderedTiles}
-      {selectedStrokesLayer}
+      {/* {selectedStrokesLayer} */}
       {currentStrokePath}
     </Layer>
   );
 }
 
 // Separate component for each tile to handle its own caching
-const Tile = memo(function Tile({ x, y, strokes, zoom }: { x: number, y: number, strokes: StrokeElement[], zoom: number }) {
+const Tile = memo(function Tile({ 
+    x, 
+    y, 
+    strokes, 
+    selectedIds,
+    zoom,
+    onNodeRef
+}: { 
+    x: number;
+    y: number;
+    strokes: StrokeElement[];
+    selectedIds: string[];
+    zoom: number;
+    onNodeRef?: (id: string, node: Konva.Node | null) => void;
+}) {
     const groupRef = useRef<Konva.Group>(null);
     const [debouncedZoom, setDebouncedZoom] = useState(zoom);
 
@@ -273,12 +229,16 @@ const Tile = memo(function Tile({ x, y, strokes, zoom }: { x: number, y: number,
         return () => clearTimeout(handler);
     }, [zoom]);
 
-    const paths = useMemo(() => {
-        return strokes.map(stroke => {
+    const unselectedStrokes = strokes.filter(s => !selectedIds.includes(s.id));
+
+    const unselectedPaths = useMemo(() => {
+        return unselectedStrokes.map(stroke => {
             const pathData = getPathData(stroke);
             return (
               <Path
                 key={stroke.id}
+                id={stroke.id}
+                name="stroke"
                 data={pathData}
                 stroke={stroke.color}
                 strokeWidth={Number.isFinite(stroke.strokeWidth) ? stroke.strokeWidth : (Number.isFinite(stroke.width) && stroke.width < 50 ? stroke.width : 2)}
@@ -288,12 +248,20 @@ const Tile = memo(function Tile({ x, y, strokes, zoom }: { x: number, y: number,
                 lineCap="round"
                 lineJoin="round"
                 perfectDrawEnabled={false}
-                listening={false}
+                hitStrokeWidth={15} // Makes thin strokes much easier to click/select
+                // ONLY unselected items can be dragged if we allow picking them up directly.
+                // But generally, we want them selected first.
+                // Let's remove draggable from unselected to prevent weird state,
+                // or let the select tool handle it.
+                ref={node => { 
+                    if (onNodeRef) {
+                        onNodeRef(stroke.id, node); 
+                    }
+                }}
               />
             );
         });
-    }, [strokes]);
-
+    }, [unselectedStrokes, onNodeRef, debouncedZoom]);
     useEffect(() => {
         if (groupRef.current) {
             // Check if group has content
@@ -317,38 +285,45 @@ const Tile = memo(function Tile({ x, y, strokes, zoom }: { x: number, y: number,
                  });
             }
         }
-    }, [paths, debouncedZoom]);
+    }, [unselectedPaths, debouncedZoom]);
 
     if (strokes.length === 0) return null;
 
     return (
-        <Group 
-            ref={groupRef} 
-            listening={false}
-            x={x}
-            y={y}
-        >
-            {paths.map((p, i) => {
-                // If we move the group to x,y, we need to offset the paths back by -x,-y
-                // because the paths have absolute coordinates.
-                // Cloning the React element to add transformation
-                // But p is a JSX element.
-                // We can wrap it in a Group with offset
-                return (
-                    <Group key={strokes[i].id} x={-x} y={-y}>
-                        {p}
+        <>
+            <Group listening={true} x={x} y={y}>
+                <Group ref={groupRef}>
+                    <Group x={-x} y={-y}>
+                        {unselectedPaths}
                     </Group>
-                )
-            })}
-        </Group>
+                </Group>
+            </Group>
+            {/* Remove the selectedPaths Group — now handled in SelectionLayer */}
+        </>
     );
 }, (prev, next) => {
-    if (prev.x !== next.x || prev.y !== next.y) return false;
+    // Only re-render if strokes change (checking lengths and zoom for simplicity)
     if (prev.zoom !== next.zoom) return false;
+    if (prev.x !== next.x || prev.y !== next.y) return false;
     if (prev.strokes.length !== next.strokes.length) return false;
-    // Check if stroke references are identical (fast due to immutable updates)
-    for (let i = 0; i < prev.strokes.length; i++) {
-        if (prev.strokes[i] !== next.strokes[i]) return false;
+    if (prev.onNodeRef !== next.onNodeRef) return false;
+    // Check if stroke or selection references are identical
+    if (prev.strokes !== next.strokes) return false;
+    
+    // If strokes are identical, we only need to re-render if the selection status of any stroke in this tile changed
+    const prevSelectedCount = prev.strokes.filter(s => prev.selectedIds.includes(s.id)).length;
+    const nextSelectedCount = next.strokes.filter(s => next.selectedIds.includes(s.id)).length;
+    
+    if (prevSelectedCount !== nextSelectedCount) return false;
+    
+    // Fallback: If we had selected items and their selection state changed
+    const prevSelectedInTile = prev.selectedIds.filter(id => prev.strokes.some(s => s.id === id));
+    const nextSelectedInTile = next.selectedIds.filter(id => next.strokes.some(s => s.id === id));
+    
+    if (prevSelectedInTile.length !== nextSelectedInTile.length) return false;
+    for (let i = 0; i < prevSelectedInTile.length; i++) {
+        if (prevSelectedInTile[i] !== nextSelectedInTile[i]) return false;
     }
+    
     return true;
 });

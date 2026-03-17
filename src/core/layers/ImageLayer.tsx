@@ -23,7 +23,7 @@ export const ImageLayer = memo(function ImageLayer() {
           key={block.id}
           block={block}
           isSelected={selectedIds.includes(block.id)}
-          listening={selectedIds.includes(block.id)} // Only interactive when selected
+          listening={selectedIds.includes(block.id)}
           onSelect={() => {
             setSelectedIds([block.id]);
           }}

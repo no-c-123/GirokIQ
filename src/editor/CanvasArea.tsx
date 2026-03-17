@@ -5,22 +5,23 @@ import { Minus, Plus } from "lucide-react";
 import { generateId } from "@/utils";
 import { useShapeSnapping } from "@/hooks/useShapeSnapping";
 import type { RecognizedShape } from "@/core/ShapeRecognizer";
-import { isStrokeInPolygon, isRectInPolygon } from "@/selection/selectionGeometry";
 import { useCanvasStore } from "@/stores/useCanvasStore";
 import { useUIStore } from "@/stores/useUIStore";
 import { useBlockStore } from "@/stores/useBlockStore";
 import { useHistoryStore } from "@/history/useHistoryStore";
 import { useAppStore } from "@/store/useAppStore";
-import { DrawingLayer } from "@/core/layers/DrawingLayer";
+import { DrawingLayer, getPathData } from "@/core/layers/DrawingLayer";
 import { GridLayer } from "@/core/layers/GridLayer";
 import { ImageLayer } from "@/core/layers/ImageLayer";
+import { SelectionLayer } from "@/core/layers/SelectionLayer";
 import { useImagePaste } from "@/hooks/useImagePaste";
 import { ImageSelectionOverlay } from "@/ui/overlays/ImageSelectionOverlay";
-import { LassoActionsOverlay } from "@/ui/overlays/LassoActionsOverlay";
-import { LassoLayer } from "@/core/layers/LassoLayer";
+
 import Konva from "konva";
 import type { StrokeElement } from "@/elements/types";
 import { spatialIndex } from "@/spatial/SpatialIndex";
+
+import { useSelectionStore } from "@/stores/useSelectionStore";
 
 const ZOOM_MIN = 0.1;
 const ZOOM_MAX = 10;
@@ -35,9 +36,15 @@ export default function CanvasArea({
   onDoubleClickPage?: (pageId: string, x: number, y: number) => void;
 }) {
   const activePageId = useAppStore((s) => s.activePageId);
+  const pages = useAppStore((s) => s.pages);
+  const activePage = useMemo(() => pages.find((p) => p.id === activePageId), [pages, activePageId]);
+  
+  const rawPattern = activePage?.settings?.grid;
+  // Handle legacy "dotted" which was drawing squares
+  const gridPattern = (rawPattern === "dotted" ? "squares" : (rawPattern || "squares")) as any;
+
   const selectBlock = useBlockStore((s) => s.selectBlock);
   const updateBlocks = useBlockStore((s) => s.updateBlocks);
-  const updateBlockSize = useBlockStore((s) => s.updateBlockSize);
   const historyPush = useHistoryStore((s) => s.push);
   
   const elements = useCanvasStore((s) => s.elements);
@@ -81,7 +88,8 @@ export default function CanvasArea({
   const gridOpacity = isDark ? 0.3 : 0.4;
   
   // TODO: Migrate these to proper stores
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const selectedIds = useSelectionStore((s) => s.selectedIds);
+  const setSelectedIds = useSelectionStore((s) => s.setSelectedIds);
   const selectionFilter = { images: true, text: true, strokes: true }; 
   
   const updateStrokes = async (updates: { id: string; points: number[] }[]) => {
@@ -130,9 +138,22 @@ export default function CanvasArea({
   const lastPanPositionRef = useRef<{ x: number; y: number } | null>(null);
   const lastGestureCenterRef = useRef<{ x: number; y: number } | null>(null);
   const lastGestureDistanceRef = useRef<number | null>(null);
+  const [selectionRectangle, setSelectionRectangle] = useState({ 
+    visible: false, 
+    x1: 0, 
+    y1: 0, 
+    x2: 0, 
+    y2: 0, 
+  }); 
+  
+  const isSelecting = useRef(false); 
+  const transformerRef = useRef<Konva.Transformer>(null); 
+  const rectRefs = useRef(new Map<string, Konva.Node>()); 
+
   const [tempStroke, setTempStroke] = useState<any | null>(null);
   const tempStrokeRef = useRef<any | null>(null);
   const tempPointsRef = useRef<number[]>([]);
+
   const [stageSize, setStageSize] = useState(() => ({
     width: window.innerWidth,
     height: window.innerHeight,
@@ -142,8 +163,6 @@ export default function CanvasArea({
      position: { x: 0, y: 0 },
      animate: false,
    }));
-   
-   const [selectionOffset, setSelectionOffset] = useState({ x: 0, y: 0 });
 
    // Use the new image paste hook
    useImagePaste(stageSize, view);
@@ -181,7 +200,7 @@ export default function CanvasArea({
         enabled: useUIStore((s) => s.shapeRecognitionEnabled)
     });
 
-   const getSelectionBBox = () => {
+  const getSelectionBBox = useCallback(() => {
     if (selectedIds.length === 0) return null;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     
@@ -212,9 +231,10 @@ export default function CanvasArea({
     
     if (minX === Infinity) return null;
     return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
-  };
+  }, [selectedIds, strokes]); // Memoize based on selected IDs and strokes
 
-  const selectionBBox = getSelectionBBox();
+
+
 
   useEffect(() => {
     const element = containerRef.current;
@@ -258,6 +278,11 @@ export default function CanvasArea({
   );
 
   const pageCurrentStroke = tempStroke;
+
+  const selectedStrokes = useMemo(
+    () => selectedIds.map(id => strokes.find(s => s.id === id)).filter((s): s is StrokeElement => s !== undefined),
+    [selectedIds, strokes]
+  );
 
   useEffect(() => {
     if (!activePageId) return;
@@ -326,8 +351,52 @@ export default function CanvasArea({
         return;
       }
 
-      // Arrow keys for panning
+      // Arrow keys for panning or moving selection
       const panStep = e.shiftKey ? 200 : 50;
+      const moveStep = e.shiftKey ? 10 : 1;
+
+      // If selection is active, move selection with Modifier keys (Cmd/Ctrl)
+      const isMoveModifier = e.metaKey || e.ctrlKey;
+      
+      if (selectedIds.length > 0 && isMoveModifier) {
+        let dx = 0;
+        let dy = 0;
+        if (e.key === "ArrowLeft") dx = -moveStep;
+        if (e.key === "ArrowRight") dx = moveStep;
+        if (e.key === "ArrowUp") dy = -moveStep;
+        if (e.key === "ArrowDown") dy = moveStep;
+
+        if (dx !== 0 || dy !== 0) {
+            e.preventDefault();
+            
+            // Move strokes
+            const strokeUpdates = selectedIds
+                .map(id => {
+                    const s = strokes.find(st => st.id === id) || spatialIndex.get(id);
+                    if (!s) return null;
+                    return {
+                        id,
+                        points: s.points.map((p, i) => i % 2 === 0 ? p + dx : p + dy)
+                    };
+                })
+                .filter((u): u is { id: string; points: number[] } => u !== null);
+            
+            if (strokeUpdates.length > 0) void updateStrokes(strokeUpdates);
+
+            // Move blocks
+            const blockUpdates = selectedIds
+                .map(id => {
+                    const b = useBlockStore.getState().blocks.find(bl => bl.id === id);
+                    if (!b) return null;
+                    return { id, x: b.x + dx, y: b.y + dy };
+                })
+                .filter((u): u is { id: string; x: number; y: number } => u !== null);
+            
+            if (blockUpdates.length > 0) void updateBlocks(blockUpdates);
+            
+            return;
+        }
+      }
 
       if (e.key === "ArrowLeft") {
         e.preventDefault();
@@ -472,8 +541,21 @@ export default function CanvasArea({
   };
 
   const handlePointerDown = (e: KonvaEventObject<PointerEvent>) => {
-    e.evt.preventDefault();
+    //e.evt.preventDefault();
     if (isGestureRef.current) return;
+
+    // Must be first — walk full parent chain to detect transformer anchors
+    let tNode: Konva.Node | null = e.target;
+    while (tNode) {
+      if (tNode.getClassName() === 'Transformer') {
+        isSelecting.current = false;
+        return;
+      }
+      tNode = tNode.getParent ? tNode.getParent() : null;
+    }
+
+    // Only preventDefault for non-transformer interactions 
+    e.evt.preventDefault();
 
     // Check for space key or middle mouse button (button 1) or hand tool
     if (isSpacePressedRef.current || e.evt.button === 1 || tool === "hand") {
@@ -485,53 +567,43 @@ export default function CanvasArea({
 
     isPointerDownRef.current = true;
     pointerDownTimeRef.current = Date.now();
-    
+
     const containerPoint = getContainerPoint(e.evt);
     if (!containerPoint) return;
     const localPoint = getStagePoint(containerPoint, view.zoom, view.position);
 
-    if (tool === "lasso") {
-      // Check if we clicked inside an existing selection to drag it
-      if (selectionBBox) {
-        const padding = 10 / stageScale;
-        if (
-          localPoint.x >= selectionBBox.x - padding &&
-          localPoint.x <= selectionBBox.x + selectionBBox.width + padding &&
-          localPoint.y >= selectionBBox.y - padding &&
-          localPoint.y <= selectionBBox.y + selectionBBox.height + padding
-        ) {
-          return;
+    if ((tool as any) === "select") {
+      isSelecting.current = true;
+      setSelectionRectangle({
+        visible: true,
+        x1: localPoint.x,
+        y1: localPoint.y,
+        x2: localPoint.x,
+        y2: localPoint.y,
+      });
+
+      if (e.target === e.target.getStage()) {
+        setSelectedIds([]);
+        useSelectionStore.getState().clearSelection();
+      } else {
+        const clickedId = e.target.id();
+        if (clickedId && (strokes.some(s => s.id === clickedId) || useBlockStore.getState().blocks.some(b => b.id === clickedId))) {
+          const metaPressed = e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey;
+          const isSelected = selectedIds.includes(clickedId);
+          if (!metaPressed && !isSelected) {
+            setSelectedIds([clickedId]);
+          } else if (metaPressed && isSelected) {
+            setSelectedIds(selectedIds.filter(id => id !== clickedId));
+          } else if (metaPressed && !isSelected) {
+            setSelectedIds([...selectedIds, clickedId]);
+          }
         }
       }
-    }
-
-    // Clear selection if we are starting a new action (unless we just returned above)
-    selectBlock(null);
-    setSelectedIds([]);
-
-    if (tool === "lasso") {
-      const stroke = {
-        id: "lasso-current",
-        pageId: "lasso",
-        points: [localPoint.x, localPoint.y],
-        color: "#6366f1",
-        width: 0,
-        height: 0,
-        x: localPoint.x,
-        y: localPoint.y,
-        strokeWidth: 1 / stageScale,
-        backgroundColor: "rgba(99, 102, 241, 0.1)",
-        pressures: [0.5],
-        type: "stroke" as const,
-        strokeStyle: "dashed",
-        opacity: 1,
-        sloppiness: 0
-      };
-      setTempStroke(stroke);
-      tempStrokeRef.current = stroke;
-      tempPointsRef.current = [localPoint.x, localPoint.y];
       return;
     }
+
+    selectBlock(null);
+    useSelectionStore.getState().clearSelection();
 
     if (tool === "eraser") {
       isErasingRef.current = true;
@@ -543,19 +615,17 @@ export default function CanvasArea({
     const isDrawingTool = ["pen", "rectangle", "diamond", "ellipse", "arrow", "line"].includes(tool);
     if (!isDrawingTool) return;
 
-    const pressure = 0.5; // Always neutral pressure
-
     const stroke = {
       id: generateId(),
       pageId: activePageId,
       points: [localPoint.x, localPoint.y],
       color,
-      strokeWidth: strokeWidth, // Explicitly set strokeWidth
-      width: 0, // Initial bbox width
-      height: 0, // Initial bbox height
+      strokeWidth,
+      width: 0,
+      height: 0,
       x: localPoint.x,
       y: localPoint.y,
-      pressures: [pressure],
+      pressures: [0.5],
       shapeType: tool === "pen" ? undefined : tool,
       strokeStyle,
       backgroundColor: shapeBackgroundColor,
@@ -563,8 +633,7 @@ export default function CanvasArea({
       edges,
       sloppiness,
     } as StrokeElement;
-    
-    // Imperative update for smoothness
+
     setTempStroke(stroke);
     tempStrokeRef.current = stroke;
     tempPointsRef.current = [localPoint.x, localPoint.y];
@@ -590,6 +659,28 @@ export default function CanvasArea({
   };
 
   const handlePointerMove = (e: KonvaEventObject<PointerEvent>) => {
+    // Don't interfere if transformer is active
+    let tNode: Konva.Node | null = e.target;
+    while (tNode) {
+      if (tNode.getClassName() === 'Transformer') {
+        isSelecting.current = false;
+        return;
+      }
+      tNode = tNode.getParent ? tNode.getParent() : null;
+    }
+
+    if ((tool as any) === "select" && isSelecting.current) {
+      const containerPoint = getContainerPoint(e.evt);
+      if (!containerPoint) return;
+      const localPoint = getStagePoint(containerPoint, view.zoom, view.position);
+      setSelectionRectangle(prev => ({
+        ...prev,
+        x2: localPoint.x,
+        y2: localPoint.y,
+      }));
+      return;
+    }
+
     e.evt.preventDefault();
     if (isGestureRef.current) return;
 
@@ -597,7 +688,6 @@ export default function CanvasArea({
       const dx = e.evt.clientX - lastPanPositionRef.current.x;
       const dy = e.evt.clientY - lastPanPositionRef.current.y;
       lastPanPositionRef.current = { x: e.evt.clientX, y: e.evt.clientY };
-      
       setView((prev) => ({
         ...prev,
         position: { x: prev.position.x + dx, y: prev.position.y + dy },
@@ -616,201 +706,182 @@ export default function CanvasArea({
     }
 
     const isDrawingTool = ["pen", "rectangle", "diamond", "ellipse", "arrow", "line"].includes(tool);
-    if (!isDrawingTool && tool !== "lasso") return;
-    if (isDrawingTool && !tempStrokeRef.current) return;
-    if (tool === "lasso" && !tempStrokeRef.current) return;
+    if (!isDrawingTool) return;
+    if (!tempStrokeRef.current) return;
 
-    // Handle shapes (drag to create)
-    if (isDrawingTool && tool !== "pen") {
-        const startX = tempPointsRef.current[0];
-        const startY = tempPointsRef.current[1];
-        const newPoints = getShapePoints(tool, startX, startY, localPoint.x, localPoint.y);
-        
-        // Update temp stroke directly
-        setTempStroke((prev: any) => {
-            if (!prev) return null;
-            return {
-                ...prev,
-                points: newPoints
-            };
-        });
-        return;
+    if (tool !== "pen") {
+      const startX = tempPointsRef.current[0];
+      const startY = tempPointsRef.current[1];
+      const newPoints = getShapePoints(tool, startX, startY, localPoint.x, localPoint.y);
+      setTempStroke((prev: any) => {
+        if (!prev) return null;
+        return { ...prev, points: newPoints };
+      });
+      return;
     }
 
-    // Use coalesced events if available for smoother curves
     const rawEvents = (e.evt as any).getCoalescedEvents
       ? (e.evt as any).getCoalescedEvents()
       : [e.evt];
 
-    // Create a local buffer to avoid repeated state updates in the loop
     const newPoints: number[] = [];
-
     for (const evt of rawEvents) {
-      const containerPoint = getContainerPoint(evt);
-      if (!containerPoint) continue;
-      const localPoint = getStagePoint(containerPoint, view.zoom, view.position);
-
-      // Optimize point capture: prevent adding points too close to each other
+      const cp = getContainerPoint(evt);
+      if (!cp) continue;
+      const lp = getStagePoint(cp, view.zoom, view.position);
       if (tempPointsRef.current.length >= 2) {
         const lastX = tempPointsRef.current[tempPointsRef.current.length - 2];
         const lastY = tempPointsRef.current[tempPointsRef.current.length - 1];
-        const dx = localPoint.x - lastX;
-        const dy = localPoint.y - lastY;
-        // Reduced threshold to 0.5px for smoother curves
+        const dx = lp.x - lastX;
+        const dy = lp.y - lastY;
+        if (dx * dx + dy * dy < 0.25) continue;
+      } else if (newPoints.length >= 2) {
+        const lastX = newPoints[newPoints.length - 2];
+        const lastY = newPoints[newPoints.length - 1];
+        const dx = lp.x - lastX;
+        const dy = lp.y - lastY;
         if (dx * dx + dy * dy < 0.25) continue;
       }
-      else if (newPoints.length >= 2) {
-         // Check against last added point in this batch
-         const lastX = newPoints[newPoints.length - 2];
-         const lastY = newPoints[newPoints.length - 1];
-         const dx = localPoint.x - lastX;
-         const dy = localPoint.y - lastY;
-         if (dx * dx + dy * dy < 0.25) continue;
-      }
-
-      newPoints.push(localPoint.x, localPoint.y);
-      tempPointsRef.current.push(localPoint.x, localPoint.y);
+      newPoints.push(lp.x, lp.y);
+      tempPointsRef.current.push(lp.x, lp.y);
     }
-    
-    if (newPoints.length > 0) {
-        // If we are snapping, we don't update tempStroke with raw points here
-        // The snapHook will handle cancellation if we move significantly
-        // But for immediate feedback, we might want to update?
-        // Actually, if isSnapping is true, we should cancel first.
-        // snapHook.handleMove calls onCancel which updates tempStroke.
-        // So we just update tempStroke normally here, and if snap happens later, it overwrites.
-        
-        snapHook.handleMove(tempPointsRef.current);
 
-        if (!snapHook.isSnapping) {
-            setTempStroke((prev: any) => {
-                if (!prev) return null;
-                return {
-                    ...prev,
-                    points: [...tempPointsRef.current]
-                };
-            });
-        }
+    if (newPoints.length > 0) {
+      snapHook.handleMove(tempPointsRef.current);
+      if (!snapHook.isSnapping) {
+        setTempStroke((prev: any) => {
+          if (!prev) return null;
+          return { ...prev, points: [...tempPointsRef.current] };
+        });
+      }
     }
   };
 
-  const handlePointerUp = () => {
+  const handlePointerUp = (e: KonvaEventObject<PointerEvent>) => {
+    // Don't interfere if transformer is active
+    let tNode: Konva.Node | null = e.target;
+    while (tNode) {
+      if (tNode.getClassName() === 'Transformer') return;
+      tNode = tNode.getParent ? tNode.getParent() : null;
+    }
+
+    isPointerDownRef.current = false;
+
+    if (isSelecting.current) {
+      isSelecting.current = false;
+      setTimeout(() => {
+        setSelectionRectangle(prev => ({ ...prev, visible: false }));
+      });
+
+      const selBox = {
+        x: Math.min(selectionRectangle.x1, selectionRectangle.x2),
+        y: Math.min(selectionRectangle.y1, selectionRectangle.y2),
+        width: Math.abs(selectionRectangle.x2 - selectionRectangle.x1),
+        height: Math.abs(selectionRectangle.y2 - selectionRectangle.y1),
+      };
+
+      if (selBox.width > 0 && selBox.height > 0) {
+        const selected: string[] = [];
+        if (selectionFilter.strokes) {
+          for (const stroke of pageStrokes) {
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            for (let i = 0; i < stroke.points.length; i += 2) {
+              minX = Math.min(minX, stroke.points[i]);
+              minY = Math.min(minY, stroke.points[i + 1]);
+              maxX = Math.max(maxX, stroke.points[i]);
+              maxY = Math.max(maxY, stroke.points[i + 1]);
+            }
+            const strokeBox = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+            if (!(
+              strokeBox.x > selBox.x + selBox.width ||
+              strokeBox.x + strokeBox.width < selBox.x ||
+              strokeBox.y > selBox.y + selBox.height ||
+              strokeBox.y + strokeBox.height < selBox.y
+            )) {
+              selected.push(stroke.id);
+            }
+          }
+        }
+        setSelectedIds(selected);
+      }
+      return;
+    }
+
     if (isPanningRef.current) {
       isPanningRef.current = false;
       if (viewportRef.current) {
-        viewportRef.current.style.cursor = isSpacePressedRef.current ? "grab" : "default";
-        // If we reverted to default, check tool
-        if (!isSpacePressedRef.current) {
-             if (["pen", "eraser", "lasso", "rectangle", "diamond", "ellipse", "arrow", "line"].includes(tool)) {
-                 viewportRef.current.style.cursor = "crosshair";
-             } else if (tool === "text") {
-                 viewportRef.current.style.cursor = "text";
-             }
+        if (isSpacePressedRef.current) {
+          viewportRef.current.style.cursor = "grab";
+        } else if (["pen", "eraser", "lasso", "rectangle", "diamond", "ellipse", "arrow", "line"].includes(tool)) {
+          viewportRef.current.style.cursor = "crosshair";
+        } else if (tool === "text") {
+          viewportRef.current.style.cursor = "text";
+        } else {
+          viewportRef.current.style.cursor = "default";
         }
       }
       return;
     }
 
-    if (tool === "lasso" && isPointerDownRef.current && tempStrokeRef.current) {
+    if (tempStrokeRef.current) {
       const current = tempStrokeRef.current;
-      // Use tempPointsRef for the most up-to-date points, as current.points might be stale
-      const points = tempPointsRef.current;
-      
-      if (current && points.length > 6) {
-        const selected: string[] = [];
-        
-        // Use a simpler bounds check first for performance
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        for (let i = 0; i < points.length; i += 2) {
-            minX = Math.min(minX, points[i]);
-            minY = Math.min(minY, points[i+1]);
-            maxX = Math.max(maxX, points[i]);
-            maxY = Math.max(maxY, points[i+1]);
-        }
-        
-        // Only check strokes that could possibly be inside the lasso bounds
-        // In a real implementation with QuadTree access, we would query the QuadTree here
-        // For now, filtering by pageStrokes is already better than checking global strokes
-        if (selectionFilter.strokes) {
-            for (const stroke of pageStrokes) {
-            // Quick bounding box check
-            let sMinX = Infinity, sMinY = Infinity, sMaxX = -Infinity, sMaxY = -Infinity;
-            for (let i = 0; i < stroke.points.length; i += 2) {
-                sMinX = Math.min(sMinX, stroke.points[i]);
-                sMinY = Math.min(sMinY, stroke.points[i+1]);
-                sMaxX = Math.max(sMaxX, stroke.points[i]);
-                sMaxY = Math.max(sMaxY, stroke.points[i+1]);
-            }
-            
-            if (sMaxX < minX || sMinX > maxX || sMaxY < minY || sMinY > maxY) continue;
-
-            if (isStrokeInPolygon(stroke.points, points)) {
-                selected.push(stroke.id);
-            }
-            }
-        }
-        const blocks = useBlockStore.getState().blocks;
-        for (const block of blocks) {
-          // Check type filter
-          if (block.type === "image" && !selectionFilter.images) continue;
-          if (block.type === "text" && !selectionFilter.text) continue;
-
-          if (
-            isRectInPolygon(
-              { x: block.x, y: block.y, width: block.width || 400, height: 24 },
-              points,
-            )
-          ) {
-            selected.push(block.id);
-          }
-        }
-        setSelectedIds(selected);
-      }
-      setTempStroke(null);
-      tempStrokeRef.current = null;
-      tempPointsRef.current = [];
-    } else if (tempStrokeRef.current) {
-      const current = tempStrokeRef.current;
-      
       let finalPoints = [...tempPointsRef.current];
-      // Initialize with current shapeType to avoid losing it if not snapped
       let finalShapeType: string | undefined = current.shapeType;
       let finalOriginalPoints: number[] | undefined;
 
       const snapped = snapHook.getSnappedShape();
       if (snapped) {
-          finalPoints = snapped.points.flatMap((p: {x: number, y: number}) => [p.x, p.y]);
-          finalShapeType = snapped.type;
-          finalOriginalPoints = [...tempPointsRef.current];
+        finalPoints = snapped.points.flatMap((p: { x: number; y: number }) => [p.x, p.y]);
+        finalShapeType = snapped.type;
+        finalOriginalPoints = [...tempPointsRef.current];
       }
-      
+
       snapHook.cancelSnap();
-      
-      // Save final stroke to store
-      const finalStroke: StrokeElement = {
+
+      if (current.pageId !== "lasso") {
+        const finalStroke: StrokeElement = {
           ...(current as any),
           points: finalPoints,
           shapeType: finalShapeType,
           originalPoints: finalOriginalPoints,
-          type: "stroke" // Ensure type is set
-      };
-      
-      addElement(finalStroke);
-      
-      historyPush({ type: "ADD_STROKE", stroke: finalStroke });
-      
+          type: "stroke",
+        };
+        addElement(finalStroke);
+        historyPush({ type: "ADD_STROKE", stroke: finalStroke });
+      }
+
       setTempStroke(null);
       tempStrokeRef.current = null;
       tempPointsRef.current = [];
-
-      // Removed auto-switch to lasso to allow continuous placement
-      // if (!isToolLocked) {
-      //     setTool("lasso"); // Switch back to selection tool
-      // }
     }
+
     isPointerDownRef.current = false;
     isErasingRef.current = false;
   };
+
+  useEffect(() => {
+    if (!stageRef.current) return;
+    stageRef.current.on('transformend', (e) => {
+      console.log('STAGE transformend:', e.target?.getClassName(), e.target?.id());
+    });
+  }, []);
+
+  useEffect(() => {
+    if (transformerRef.current) {
+      transformerRef.current.forceUpdate();
+      transformerRef.current.getLayer()?.batchDraw();
+    }
+  }, [view.zoom]);
+
+  const handleStrokesChange = useCallback((updates: { id: string; points: number[]; strokeWidth?: number }[]) => {
+    updateElements(updates.map(u => ({
+      id: u.id,
+      changes: {
+        points: u.points,
+        strokeWidth: u.strokeWidth
+      }
+    })));
+  }, [updateElements]);
 
   return (
     <div ref={containerRef} className="w-full h-full" style={{ backgroundColor }}>
@@ -818,7 +889,7 @@ export default function CanvasArea({
         ref={viewportRef}
         className="relative w-full h-full overflow-hidden"
         style={{ touchAction: "none" }}
-        onMouseDown={(e) => {
+        /*onMouseDown={(e) => {
           if (e.target instanceof HTMLElement && e.target.closest("textarea")) {
             return;
           }
@@ -826,7 +897,7 @@ export default function CanvasArea({
             return;
           }
           selectBlock(null);
-        }}
+        }}*/
         onDoubleClick={(e) => {
           if (!onDoubleClickPage) return;
           if (!activePageId) return;
@@ -851,6 +922,7 @@ export default function CanvasArea({
           y={view.position.y}
           scaleX={stageScale}
           scaleY={stageScale}
+          draggable={false}
           onWheel={(e) => {
             e.evt.preventDefault();
 
@@ -974,6 +1046,7 @@ export default function CanvasArea({
             gridColor={gridColor}
             backgroundColor={backgroundColor}
             opacity={gridOpacity}
+            pattern={gridPattern}
           />
           
           <ImageLayer />
@@ -981,8 +1054,6 @@ export default function CanvasArea({
           <DrawingLayer
             strokes={pageStrokes}
             currentStroke={pageCurrentStroke}
-            selectedIds={selectedIds}
-            selectionOffset={selectionOffset}
             viewport={{
               x: view.position.x,
               y: view.position.y,
@@ -990,21 +1061,32 @@ export default function CanvasArea({
               height: stageSize.height,
               zoom: view.zoom,
             }}
+            onNodeRef={(id, node) => {
+              if (node) {
+                rectRefs.current.set(id, node);
+              } else {
+                rectRefs.current.delete(id);
+              }
+            }}
           />
 
-          <LassoLayer
-            selectionBBox={selectionBBox}
-            stageScale={stageScale}
-            updateBlocks={updateBlocks}
-            updateStrokes={updateStrokes}
-            updateBlockSize={updateBlockSize}
-            strokes={strokes}
-            selectedIds={selectedIds}
-            setSelectedIds={setSelectedIds}
-            setSelectionOffset={setSelectionOffset}
+          <SelectionLayer
+            selectionRectangle={selectionRectangle}
+            selectedStrokes={selectedStrokes}
+            transformerRef={transformerRef}
+            onNodeRef={(id, node) => {
+              if (node) {
+                rectRefs.current.set(id, node);
+              } else {
+                rectRefs.current.delete(id);
+              }
+            }}
+            onStrokesChange={handleStrokesChange}
           />
+
         </Stage>
 
+        {/* HTML Overlay for Text/Images */}
         <div className="absolute inset-0 pointer-events-none">
           <div
             style={{
@@ -1012,6 +1094,7 @@ export default function CanvasArea({
               transformOrigin: "0 0",
               width: "100%",
               height: "100%",
+              pointerEvents: "none", // Ensure this container doesn't block canvas events
             }}
           >
             {children}
@@ -1020,13 +1103,7 @@ export default function CanvasArea({
 
         <ImageSelectionOverlay view={view} stageScale={stageScale} />
         
-        <LassoActionsOverlay 
-            view={view}
-            stageScale={stageScale}
-            selectionBBox={selectionBBox}
-            selectedIds={selectedIds}
-            stageRef={stageRef}
-        />
+
 
         <div
           data-canvas-ui

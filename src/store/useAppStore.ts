@@ -24,6 +24,7 @@ interface AppState {
   setActivePage: (id: string | null) => void;
   setSidebarVisible: (visible: boolean) => void;
   addPage: (page: Page) => Promise<void>;
+  updatePage: (id: string, updates: Partial<Page>) => Promise<void>;
   deletePage: (id: string) => Promise<void>;
   renamePage: (id: string, title: string) => Promise<void>;
   toggleStar: (id: string) => Promise<void>;
@@ -134,6 +135,18 @@ export const useAppStore = create<AppState>((set) => ({
     set((state) => ({
       pages: [...state.pages, page],
       activePageId: page.id,
+    }));
+  },
+
+  updatePage: async (id, updates) => {
+    const existing = await db.pages.get(id);
+    if (!existing) return;
+
+    const updated = { ...existing, ...updates, updatedAt: Date.now() };
+    await db.pages.put(updated);
+
+    set((state) => ({
+      pages: state.pages.map((p) => (p.id === id ? updated : p)),
     }));
   },
 

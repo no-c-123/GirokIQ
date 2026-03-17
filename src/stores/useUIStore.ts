@@ -2,7 +2,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type ToolType = "pen" | "eraser" | "text" | "lasso" | "image" | "shape" | "hand" | "rectangle" | "diamond" | "ellipse" | "arrow" | "line";
+export type ToolType = "pen" | "eraser" | "text" | "select" | "image" | "shape" | "hand" | "rectangle" | "diamond" | "ellipse" | "arrow" | "line";
 
 interface UIState {
   tool: ToolType;
@@ -61,7 +61,7 @@ const DEFAULT_PRESETS = [
 export const useUIStore = create<UIState>()(
   persist(
     (set) => ({
-      tool: "pen",
+      tool: "select",
       strokeWidth: 2,
       color: "#a78bfa",
       presets: DEFAULT_PRESETS,

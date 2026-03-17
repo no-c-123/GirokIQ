@@ -38,8 +38,12 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         pendingWrites.clear();
         
         const strokesToSave = idsToSave
-            .map(id => currentElements.find(e => e.id === id))
-            .filter(e => e && e.type === 'stroke');
+        .map(id => currentElements.find(e => e.id === id))
+        .filter(e => e && e.type === 'stroke')
+        .map(e => ({
+          ...e,
+          updated_at: (e as any).updatedAt ?? Date.now(), // map camelCase to snake_case
+        }));
 
         if (strokesToSave.length > 0) {
             await db.strokes.bulkPut(strokesToSave as any[]);

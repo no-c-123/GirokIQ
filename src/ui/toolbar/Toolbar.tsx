@@ -39,9 +39,9 @@ export function Toolbar() {
       />
       <ToolButton 
         icon={MousePointer2} 
-        active={tool === "lasso"} // Mapping "lasso" to selection for now
-        onClick={() => setTool("lasso")}
-        tooltip="Selection"
+        active={tool === "select"} 
+        onClick={() => setTool("select")}
+        tooltip="Select"
       />
       <ToolButton 
         icon={Square} 

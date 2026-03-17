@@ -6,21 +6,24 @@ export class SpatialIndex {
   private tree: QuadTree<StrokeElement>;
   private itemMap: Map<string, SpatialItem<StrokeElement>>;
   private version: number = 0;
+  private currentBounds: { x: number; y: number; width: number; height: number };
 
   constructor() {
-    // Large fixed bounds for infinite canvas
-    // TODO: Ideally this should expand dynamically, but for now fixed large bounds is okay as per current implementation
-    const minX = -1000000;
-    const minY = -1000000;
-    const maxX = 1000000;
-    const maxY = 1000000;
+    // Initial bounds for the quadtree
+    // We start with a reasonable size, but it will expand dynamically
+    const minX = -10000;
+    const minY = -10000;
+    const maxX = 10000;
+    const maxY = 10000;
 
-    this.tree = new QuadTree<StrokeElement>({
+    this.currentBounds = {
       x: minX,
       y: minY,
       width: maxX - minX,
       height: maxY - minY,
-    });
+    };
+
+    this.tree = new QuadTree<StrokeElement>(this.currentBounds);
     this.itemMap = new Map();
   }
 
@@ -62,9 +65,71 @@ export class SpatialIndex {
       data: stroke,
     };
 
+    // Check if the item fits in the current bounds
+    if (
+      minX < this.currentBounds.x ||
+      minY < this.currentBounds.y ||
+      maxX > this.currentBounds.x + this.currentBounds.width ||
+      maxY > this.currentBounds.y + this.currentBounds.height
+    ) {
+      this.expandBounds(item);
+    }
+
     this.tree.insert(item);
     this.itemMap.set(stroke.id, item);
     this.version++;
+  }
+
+  private expandBounds(newItem: SpatialItem<StrokeElement>) {
+    // Determine new bounds that include the new item
+    let newX = this.currentBounds.x;
+    let newY = this.currentBounds.y;
+    let newWidth = this.currentBounds.width;
+    let newHeight = this.currentBounds.height;
+
+    // Expand to the left
+    if (newItem.x < newX) {
+      const diff = newX - newItem.x;
+      const expansion = Math.max(diff, newWidth); // at least double the size
+      newX -= expansion;
+      newWidth += expansion;
+    }
+    // Expand to the top
+    if (newItem.y < newY) {
+      const diff = newY - newItem.y;
+      const expansion = Math.max(diff, newHeight);
+      newY -= expansion;
+      newHeight += expansion;
+    }
+    // Expand to the right
+    if (newItem.x + newItem.width > newX + newWidth) {
+      const diff = (newItem.x + newItem.width) - (newX + newWidth);
+      const expansion = Math.max(diff, newWidth);
+      newWidth += expansion;
+    }
+    // Expand to the bottom
+    if (newItem.y + newItem.height > newY + newHeight) {
+      const diff = (newItem.y + newItem.height) - (newY + newHeight);
+      const expansion = Math.max(diff, newHeight);
+      newHeight += expansion;
+    }
+
+    // Update current bounds
+    this.currentBounds = {
+      x: newX,
+      y: newY,
+      width: newWidth,
+      height: newHeight,
+    };
+
+    // Rebuild the tree
+    const allItems = Array.from(this.itemMap.values());
+    this.tree = new QuadTree<StrokeElement>(this.currentBounds);
+    
+    // Re-insert all items into the new tree
+    for (const item of allItems) {
+      this.tree.insert(item);
+    }
   }
 
   remove(id: string) {
@@ -82,6 +147,10 @@ export class SpatialIndex {
 
   query(rect: { x: number; y: number; width: number; height: number }): StrokeElement[] {
     return this.tree.query(rect).map((item) => item.data);
+  }
+
+  get(id: string): StrokeElement | undefined {
+    return this.itemMap.get(id)?.data;
   }
 
   getVersion() {

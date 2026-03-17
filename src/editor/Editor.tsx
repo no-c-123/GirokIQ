@@ -10,6 +10,7 @@ import {
   Minimize2, 
   Type, 
   Sidebar as SidebarIcon,
+  Grid,
 } from "lucide-react";
 import { cn } from "@/utils";
 import CanvasArea from "@/editor/CanvasArea";
@@ -30,11 +31,14 @@ interface EditorProps {
 export function Editor({ page, notebook }: EditorProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showPatternMenu, setShowPatternMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const patternMenuRef = useRef<HTMLDivElement>(null);
   const pageId = page?.id;
 
   const sidebarVisible = useAppStore((s) => s.sidebarVisible);
   const setSidebarVisible = useAppStore((s) => s.setSidebarVisible);
+  const updatePage = useAppStore((s) => s.updatePage);
 
   const blocks = useBlockStore((s) => s.blocks);
   const hydrateBlocksForPage = useBlockStore((s) => s.hydrateBlocksForPage);
@@ -95,12 +99,15 @@ export function Editor({ page, notebook }: EditorProps) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setShowMenu(false);
       }
+      if (patternMenuRef.current && !patternMenuRef.current.contains(event.target as Node)) {
+        setShowPatternMenu(false);
+      }
     }
-    if (showMenu) {
+    if (showMenu || showPatternMenu) {
       document.addEventListener("mousedown", handleClickOutside);
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showMenu]);
+  }, [showMenu, showPatternMenu]);
 
   useEffect(() => {
     if (!page) {
@@ -174,6 +181,58 @@ export function Editor({ page, notebook }: EditorProps) {
             }}
           />
           <div className="w-px h-4 bg-[var(--border-subtle)] mx-2" />
+          
+          <div className="relative">
+            <ToolbarButton 
+              icon={Grid} 
+              tooltip="Background Pattern" 
+              onClick={() => setShowPatternMenu(!showPatternMenu)}
+            />
+            <AnimatePresence>
+              {showPatternMenu && (
+                <motion.div
+                  ref={patternMenuRef}
+                  initial={{ opacity: 0, scale: 0.95, y: 5 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 5 }}
+                  transition={{ duration: 0.1 }}
+                  className="absolute right-0 top-full mt-2 w-40 bg-[var(--bg-panel)] border border-[var(--border-subtle)] rounded-lg shadow-xl overflow-hidden z-50"
+                  style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
+                >
+                  <div className="p-1">
+                    {[
+                      { id: "squares", label: "Squares" },
+                      { id: "lines", label: "Lines" },
+                      { id: "dots", label: "Dots" },
+                      { id: "none", label: "No pattern" }
+                    ].map(pattern => (
+                      <button 
+                        key={pattern.id}
+                        onClick={() => {
+                          updatePage(page.id, { 
+                            settings: { 
+                              ...page.settings, 
+                              grid: pattern.id 
+                            } 
+                          });
+                          setShowPatternMenu(false);
+                        }}
+                        className={cn(
+                          "flex items-center w-full px-3 py-2 text-sm rounded transition-colors text-left",
+                          ((page.settings?.grid === "dotted" ? "squares" : page.settings?.grid) || "squares") === pattern.id 
+                            ? "bg-[var(--accent-subtle)]/30 text-[var(--accent-primary)] font-medium" 
+                            : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-canvas)]"
+                        )}
+                      >
+                        <span className="flex-1">{pattern.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
           <ToolbarButton 
             icon={isFullscreen ? Minimize2 : Maximize2} 
             onClick={() => setIsFullscreen(!isFullscreen)}

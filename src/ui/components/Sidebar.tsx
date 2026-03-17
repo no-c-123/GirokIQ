@@ -111,7 +111,7 @@ export function Sidebar() {
         settings: {
           size: "A4",
           orientation: "portrait",
-          grid: "dotted",
+          grid: "squares",
           zoom: 1,
         }
       };
@@ -127,7 +127,7 @@ export function Sidebar() {
         {/* Header */}
         <div className="p-4 pt-6">
           <div className="flex items-center gap-2 mb-6 px-2">
-            <img src="/Girok-logo-G.png" alt="GirokIQ Logo" className="w-8 h-8 object-contain" />
+            <img src="/girok-iq-logo.png" alt="GirokIQ Logo" className="w-8 h-8 object-contain" />
             <span className="font-medium text-[var(--text-primary)] tracking-tight">GirokIQ</span>
           </div>
 
