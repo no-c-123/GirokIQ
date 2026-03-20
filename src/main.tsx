@@ -6,7 +6,7 @@ import { LoginPage } from '@/ui/components/LoginPage.tsx'
 import App from '@/app/App.tsx'
 import { useAuthStore } from '@/store/useAuthStore'
 import { Analytics } from '@vercel/analytics/react'
-import { SpeedInsights } from "@vercel/speed-insights/next"
+import { SpeedInsights } from "@vercel/speed-insights/react"
 
 function AppRoutes() {
   const { session, initialize, loading } = useAuthStore();
