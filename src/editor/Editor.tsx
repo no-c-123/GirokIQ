@@ -124,9 +124,9 @@ export function Editor({ page, notebook }: EditorProps) {
 
   if (!page) {
     return (
-      <div className="flex-1 h-full flex items-center justify-center text-[var(--text-secondary)]">
+      <div className="flex-1 h-full flex items-center justify-center text-(--text-secondary)">
         <div className="text-center">
-          <div className="w-16 h-16 bg-[var(--bg-panel)] rounded-full flex items-center justify-center mx-auto mb-4 border border-[var(--border-subtle)]">
+          <div className="w-16 h-16 bg-(--bg-panel) rounded-full flex items-center justify-center mx-auto mb-4 border border-(--border-subtle)">
             <Type className="w-8 h-8 opacity-20" />
           </div>
           <p>Select a page to start writing</p>
@@ -136,9 +136,9 @@ export function Editor({ page, notebook }: EditorProps) {
   }
 
   return (
-    <div className="flex-1 h-full flex flex-col relative overflow-hidden bg-[var(--bg-canvas)] transition-colors duration-300">
+    <div className="flex-1 h-full flex flex-col relative overflow-hidden bg-(--bg-canvas) transition-colors duration-300">
       {/* Top Bar */}
-      <header className="layout-header h-14 flex items-center justify-between px-6 backdrop-blur-sm z-10 transition-colors duration-300 border-b border-[var(--border-subtle)]">
+      <header className="layout-header h-14 flex items-center justify-between px-6 backdrop-blur-sm z-10 transition-colors duration-300 border-b border-(--border-subtle)">
         <div className="flex items-center gap-4 w-1/4">
           <ToolbarButton 
             icon={SidebarIcon} 
@@ -146,12 +146,12 @@ export function Editor({ page, notebook }: EditorProps) {
             tooltip="Toggle Sidebar (Cmd+S)"
             active={sidebarVisible}
           />
-          <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)] overflow-hidden">
-            <span className="hover:text-[var(--text-primary)] cursor-pointer transition-colors truncate">
+          <div className="flex items-center gap-2 text-sm text-(--text-secondary) overflow-hidden">
+            <span className="hover:text-(--text-primary) cursor-pointer transition-colors truncate">
               {notebook?.name || "Notebook"}
             </span>
-            <span className="text-[var(--text-tertiary)]">/</span>
-            <span className="text-[var(--text-primary)] font-medium truncate">{page.title}</span>
+            <span className="text-(--text-tertiary)">/</span>
+            <span className="text-(--text-primary) font-medium truncate">{page.title}</span>
           </div>
         </div>
 
@@ -180,7 +180,7 @@ export function Editor({ page, notebook }: EditorProps) {
               alert("Link copied to clipboard!");
             }}
           />
-          <div className="w-px h-4 bg-[var(--border-subtle)] mx-2" />
+          <div className="w-px h-4 bg-(--border-subtle) mx-2" />
           
           <div className="relative">
             <ToolbarButton 
@@ -196,7 +196,7 @@ export function Editor({ page, notebook }: EditorProps) {
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95, y: 5 }}
                   transition={{ duration: 0.1 }}
-                  className="absolute right-0 top-full mt-2 w-40 bg-[var(--bg-panel)] border border-[var(--border-subtle)] rounded-lg shadow-xl overflow-hidden z-50"
+                  className="absolute right-0 top-full mt-2 w-40 bg-(--bg-panel) border border-(--border-subtle) rounded-lg shadow-xl overflow-hidden z-50"
                   style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
                 >
                   <div className="p-1">
@@ -220,8 +220,8 @@ export function Editor({ page, notebook }: EditorProps) {
                         className={cn(
                           "flex items-center w-full px-3 py-2 text-sm rounded transition-colors text-left",
                           ((page.settings?.grid === "dotted" ? "squares" : page.settings?.grid) || "squares") === pattern.id 
-                            ? "bg-[var(--accent-subtle)]/30 text-[var(--accent-primary)] font-medium" 
-                            : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-canvas)]"
+                            ? "bg-(--accent-subtle)/30 text-(--accent-primary) font-medium" 
+                            : "text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-canvas)"
                         )}
                       >
                         <span className="flex-1">{pattern.label}</span>
@@ -252,7 +252,7 @@ export function Editor({ page, notebook }: EditorProps) {
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95, y: 5 }}
                   transition={{ duration: 0.1 }}
-                  className="absolute right-0 top-full mt-2 w-48 bg-[var(--bg-panel)] border border-[var(--border-subtle)] rounded-lg shadow-xl overflow-hidden z-50"
+                  className="absolute right-0 top-full mt-2 w-48 bg-(--bg-panel) border border-(--border-subtle) rounded-lg shadow-xl overflow-hidden z-50"
                   style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
                 >
                   <div className="p-1">
@@ -261,7 +261,7 @@ export function Editor({ page, notebook }: EditorProps) {
                         window.print();
                         setShowMenu(false);
                       }}
-                      className="flex items-center w-full px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-canvas)] rounded transition-colors text-left"
+                      className="flex items-center w-full px-3 py-2 text-sm text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-canvas) rounded transition-colors text-left"
                     >
                       <span className="flex-1">Export PDF</span>
                     </button>
@@ -271,11 +271,11 @@ export function Editor({ page, notebook }: EditorProps) {
                         setShowMenu(false);
                         alert("Link copied to clipboard!");
                       }}
-                      className="flex items-center w-full px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-canvas)] rounded transition-colors text-left"
+                      className="flex items-center w-full px-3 py-2 text-sm text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-canvas) rounded transition-colors text-left"
                     >
                       <span className="flex-1">Copy Link</span>
                     </button>
-                    <div className="h-px bg-[var(--border-subtle)] my-1" />
+                    <div className="h-px bg-(--border-subtle) my-1" />
                     <button 
                       onClick={() => {
                         if (confirm("Are you sure you want to delete this page?")) {
@@ -296,7 +296,7 @@ export function Editor({ page, notebook }: EditorProps) {
       </header>
 
       {/* Main Canvas Area */}
-      <div className="flex-1 relative overflow-hidden bg-[var(--bg-canvas)]">
+      <div className="flex-1 relative overflow-hidden bg-(--bg-canvas)">
         
         {/* Properties Panel */}
         {page.type === "canvas" && (
@@ -361,8 +361,8 @@ function ToolbarButton({
       className={cn(
         "p-2 rounded-md transition-colors",
         active 
-          ? "text-[var(--accent-primary)] bg-[var(--accent-subtle)]/20" 
-          : "text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-panel)]"
+          ? "text-(--accent-primary) bg-(--accent-subtle)/20" 
+          : "text-(--text-tertiary) hover:text-(--text-primary) hover:bg-(--bg-panel)"
       )}
       title={tooltip}
     >
