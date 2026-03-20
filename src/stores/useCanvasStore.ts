@@ -98,7 +98,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
               y: minY,
               width: maxX - minX,
               height: maxY - minY,
-              strokeWidth: strokeWidth, // Use sanitized width for rendering style
+              strokeWidth: strokeWidth,
               rotation: 0
           } as CanvasElement;
     });

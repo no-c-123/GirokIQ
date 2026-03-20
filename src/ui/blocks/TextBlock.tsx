@@ -4,14 +4,13 @@ import { useBlockStore } from "@/stores/useBlockStore";
 import { useHistoryStore } from "@/history/useHistoryStore";
 import { useUIStore } from "@/stores/useUIStore";
 import type { CanvasElement } from "@/data/models/canvas";
-import { Trash2 } from "lucide-react";
+import DeleteButton from "@/ui/components/DeleteButton";
 
 export function TextBlock({ block }: { block: CanvasElement }) {
   const update = useBlockStore((s) => s.updateBlock);
   const updatePosition = useBlockStore((s) => s.updateBlockPosition);
   const updateSize = useBlockStore((s) => s.updateBlockSize);
   const commitPosition = useBlockStore((s) => s.commitBlockPosition);
-  const deleteBlock = useBlockStore((s) => s.deleteBlock);
   const selectBlock = useBlockStore((s) => s.selectBlock);
   const selectedBlockId = useBlockStore((s) => s.selectedBlockId);
   const isSelected = selectedBlockId === block.id;
@@ -29,20 +28,6 @@ export function TextBlock({ block }: { block: CanvasElement }) {
   const editBeforeRef = useRef<CanvasElement | null>(null);
   const moveFrameRef = useRef<number | null>(null);
   const latestMoveRef = useRef<{ id: string; x?: number; y?: number; width?: number; height?: number } | null>(null);
-
-  useEffect(() => {
-    if (isSelected) {
-      const onKeyDown = (e: KeyboardEvent) => {
-        if (e.key === "Delete" || e.key === "Backspace") {
-          const target = e.target as HTMLElement;
-          if (target.tagName.toLowerCase() === "textarea") return;
-          void deleteBlock(block.id);
-        }
-      };
-      window.addEventListener("keydown", onKeyDown);
-      return () => window.removeEventListener("keydown", onKeyDown);
-    }
-  }, [isSelected, block.id, deleteBlock]);
 
   useEffect(() => {
     if (!dragging && !resizing) return;
@@ -228,14 +213,7 @@ export function TextBlock({ block }: { block: CanvasElement }) {
           </div>
 
           {/* Delete Button */}
-          <button
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={() => deleteBlock(block.id)}
-            className="absolute -top-10 left-0 bg-zinc-900 border border-white/10 p-2 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-all shadow-xl backdrop-blur-md"
-            title="Delete Textbox"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          <DeleteButton block={block} />
         </>
       )}
     </div>

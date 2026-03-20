@@ -18,12 +18,8 @@ interface UIState {
     text: boolean;
     strokes: boolean;
   };
-  // New properties
   strokeStyle: "solid" | "dashed" | "dotted";
-  sloppiness: number;
-  edges: "sharp" | "round";
   opacity: number;
-  backgroundColor: string;
   isToolLocked: boolean;
 
   setTool: (tool: ToolType) => void;
@@ -36,12 +32,8 @@ interface UIState {
   setSelectedIds: (ids: string[]) => void;
   setShapeRecognitionEnabled: (enabled: boolean) => void;
   setSelectionFilter: (filter: Partial<{ images: boolean; text: boolean; strokes: boolean }>) => void;
-  // New setters
   setStrokeStyle: (style: "solid" | "dashed" | "dotted") => void;
-  setSloppiness: (sloppiness: number) => void;
-  setEdges: (edges: "sharp" | "round") => void;
   setOpacity: (opacity: number) => void;
-  setBackgroundColor: (color: string) => void;
   setIsToolLocked: (locked: boolean) => void;
 }
 
@@ -85,10 +77,7 @@ export const useUIStore = create<UIState>()(
       setShapeRecognitionEnabled: (enabled) => set({ shapeRecognitionEnabled: enabled }),
       setSelectionFilter: (filter) => set((state) => ({ selectionFilter: { ...state.selectionFilter, ...filter } })),
       setStrokeStyle: (style) => set({ strokeStyle: style }),
-      setSloppiness: (sloppiness) => set({ sloppiness }),
-      setEdges: (edges) => set({ edges }),
       setOpacity: (opacity) => set({ opacity }),
-      setBackgroundColor: (color) => set({ backgroundColor: color }),
       setIsToolLocked: (locked) => set({ isToolLocked: locked }),
       addRecentColor: (color) =>
         set((state) => {
@@ -121,12 +110,8 @@ export const useUIStore = create<UIState>()(
         sidebarVisible: state.sidebarVisible,
         shapeRecognitionEnabled: state.shapeRecognitionEnabled,
         strokeStyle: state.strokeStyle,
-        sloppiness: state.sloppiness,
-        edges: state.edges,
         opacity: state.opacity,
-        backgroundColor: state.backgroundColor,
         isToolLocked: state.isToolLocked,
-        // selectionFilter // maybe not persist selection filter? or yes.
       }),
     }
   )

@@ -15,7 +15,7 @@ import { GridLayer } from "@/core/layers/GridLayer";
 import { ImageLayer } from "@/core/layers/ImageLayer";
 import { SelectionLayer } from "@/core/layers/SelectionLayer";
 import { useImagePaste } from "@/hooks/useImagePaste";
-import { ImageSelectionOverlay } from "@/ui/overlays/ImageSelectionOverlay";
+import { SelectionOverlay } from "@/ui/overlays/SelectionOverlay";
 
 import Konva from "konva";
 import type { StrokeElement } from "@/elements/types";
@@ -45,6 +45,8 @@ export default function CanvasArea({
 
   const selectBlock = useBlockStore((s) => s.selectBlock);
   const updateBlocks = useBlockStore((s) => s.updateBlocks);
+  const updateBlockSize = useBlockStore((s) => s.updateBlockSize);
+  const blocks = useBlockStore((s) => s.blocks);
   const historyPush = useHistoryStore((s) => s.push);
   
   const elements = useCanvasStore((s) => s.elements);
@@ -60,10 +62,7 @@ export default function CanvasArea({
   const strokeWidth = useUIStore((s) => s.strokeWidth);
   const color = useUIStore((s) => s.color);
   const strokeStyle = useUIStore((s) => s.strokeStyle);
-  const sloppiness = useUIStore((s) => s.sloppiness);
-  const edges = useUIStore((s) => s.edges);
   const opacity = useUIStore((s) => s.opacity);
-  const shapeBackgroundColor = useUIStore((s) => s.backgroundColor);
 
   // Theme aware colors - we need to listen to theme changes
   const [isDark, setIsDark] = useState(true);
@@ -252,6 +251,20 @@ export default function CanvasArea({
     () => selectedIds.map(id => strokes.find(s => s.id === id)).filter((s): s is StrokeElement => s !== undefined),
     [selectedIds, strokes]
   );
+
+  const selectedBlocks = useMemo(
+    () => selectedIds.map(id => blocks.find(b => b.id === id)).filter((b) => b !== undefined),
+    [selectedIds, blocks]
+  );
+
+  const deleteBlock = useBlockStore((s) => s.deleteBlock);
+
+  const handleDeleteSelected = useCallback(() => {
+    selectedStrokes.forEach(s => removeElement(s.id));
+    selectedBlocks.forEach(b => deleteBlock(b.id));
+    setSelectedIds([]);
+    useSelectionStore.getState().clearSelection();
+  }, [selectedStrokes, selectedBlocks, removeElement, deleteBlock, setSelectedIds]);
 
   useEffect(() => {
     if (!activePageId) return;
@@ -597,10 +610,7 @@ export default function CanvasArea({
       pressures: [0.5],
       shapeType: tool === "pen" ? undefined : tool,
       strokeStyle,
-      backgroundColor: shapeBackgroundColor,
       opacity,
-      edges,
-      sloppiness,
     } as StrokeElement;
 
     setTempStroke(stroke);
@@ -771,6 +781,29 @@ export default function CanvasArea({
             }
           }
         }
+
+        // Add blocks (images, text) to selection
+        const pageBlocks = blocks.filter(b => b.pageId === activePageId);
+        for (const block of pageBlocks) {
+          if ((block.type === 'image' && selectionFilter.images) || 
+              (block.type === 'text' && selectionFilter.text)) {
+            const blockBox = { 
+              x: block.x, 
+              y: block.y, 
+              width: block.width || 100, 
+              height: block.height || 50 
+            };
+            if (!(
+              blockBox.x > selBox.x + selBox.width ||
+              blockBox.x + blockBox.width < selBox.x ||
+              blockBox.y > selBox.y + selBox.height ||
+              blockBox.y + blockBox.height < selBox.y
+            )) {
+              selected.push(block.id);
+            }
+          }
+        }
+
         setSelectedIds(selected);
       }
       return;
@@ -851,6 +884,35 @@ export default function CanvasArea({
       }
     })));
   }, [updateElements]);
+
+  const handleBlocksChange = useCallback((updates: { id: string; x: number; y: number; width?: number; height?: number }[]) => {
+    const posUpdates = updates.map(u => ({ id: u.id, x: u.x, y: u.y }));
+    if (posUpdates.length > 0) {
+      updateBlocks(posUpdates);
+    }
+    
+    updates.forEach(u => {
+      if (u.width !== undefined && u.height !== undefined) {
+        updateBlockSize(u.id, u.width, u.height);
+      }
+    });
+  }, [updateBlocks, updateBlockSize]);
+
+  const handleNodeRef = useCallback((id: string, node: Konva.Node | null) => {
+    if (node) {
+      rectRefs.current.set(id, node);
+    } else {
+      rectRefs.current.delete(id);
+    }
+  }, []);
+
+  const viewportConfig = useMemo(() => ({
+    x: view.position.x,
+    y: view.position.y,
+    width: stageSize.width,
+    height: stageSize.height,
+    zoom: view.zoom,
+  }), [view.position.x, view.position.y, stageSize.width, stageSize.height, view.zoom]);
 
   return (
     <div ref={containerRef} className="w-full h-full" style={{ backgroundColor }}>
@@ -1023,35 +1085,20 @@ export default function CanvasArea({
           <DrawingLayer
             strokes={pageStrokes}
             currentStroke={pageCurrentStroke}
-            viewport={{
-              x: view.position.x,
-              y: view.position.y,
-              width: stageSize.width,
-              height: stageSize.height,
-              zoom: view.zoom,
-            }}
-            onNodeRef={(id, node) => {
-              if (node) {
-                rectRefs.current.set(id, node);
-              } else {
-                rectRefs.current.delete(id);
-              }
-            }}
+            viewport={viewportConfig}
+            onNodeRef={handleNodeRef}
           />
 
           <SelectionLayer
             selectionRectangle={selectionRectangle}
             selectedStrokes={selectedStrokes}
+            selectedBlocks={selectedBlocks}
             transformerRef={transformerRef}
-            onNodeRef={(id, node) => {
-              if (node) {
-                rectRefs.current.set(id, node);
-              } else {
-                rectRefs.current.delete(id);
-              }
-            }}
+            onNodeRef={handleNodeRef}
             onStrokesChange={handleStrokesChange}
+            onBlocksChange={handleBlocksChange}
           />
+
 
         </Stage>
 
@@ -1070,7 +1117,13 @@ export default function CanvasArea({
           </div>
         </div>
 
-        <ImageSelectionOverlay view={view} stageScale={stageScale} />
+        <SelectionOverlay 
+          view={view} 
+          stageScale={stageScale} 
+          selectedStrokes={selectedStrokes}
+          selectedBlocks={selectedBlocks}
+          onDelete={handleDeleteSelected}
+        />
         
 
 

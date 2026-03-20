@@ -139,10 +139,14 @@ export function DrawingLayer({
         }
     }
     return keys;
-  }, [viewport?.x, viewport?.y, viewport?.width, viewport?.height, viewport?.zoom]);
+  }, [viewport]);
 
   // Query strokes for each visible tile
   const renderedTiles = useMemo(() => {
+    // We reference strokes here to ensure this useMemo re-runs whenever the global strokes array changes,
+    // because spatialIndex is a mutable singleton and doesn't trigger React renders on its own.
+    void strokes;
+    
     return visibleTileKeys.map(key => {
         const tileX = key.x * TILE_SIZE;
         const tileY = key.y * TILE_SIZE;
@@ -170,7 +174,7 @@ export function DrawingLayer({
             />
         );
     });
-  }, [visibleTileKeys, strokes, selectedIds, viewport?.zoom, onNodeRef]); 
+  }, [visibleTileKeys, selectedIds, viewport?.zoom, onNodeRef, strokes]); 
 
   // Current stroke path generation
   const currentStrokePath = useMemo(() => {
@@ -181,7 +185,7 @@ export function DrawingLayer({
       <Path
         data={pathData}
         stroke={currentStroke.color}
-        strokeWidth={currentStroke.width}
+        strokeWidth={Number.isFinite(currentStroke.strokeWidth) ? currentStroke.strokeWidth : 2}
         dash={currentStroke.strokeStyle === "dashed" ? [10, 10] : currentStroke.strokeStyle === "dotted" ? [5, 5] : undefined}
         opacity={currentStroke.opacity ? currentStroke.opacity / 100 : 1}
         fill={currentStroke.backgroundColor && currentStroke.backgroundColor !== "transparent" ? currentStroke.backgroundColor : undefined}
@@ -191,7 +195,7 @@ export function DrawingLayer({
         listening={false}
       />
     );
-  }, [currentStroke, viewport?.zoom]);
+  }, [currentStroke]);
 
   return (
     <Layer listening={true}>
@@ -302,21 +306,27 @@ const Tile = memo(function Tile({
         </>
     );
 }, (prev, next) => {
-    // Only re-render if strokes change (checking lengths and zoom for simplicity)
     if (prev.zoom !== next.zoom) return false;
     if (prev.x !== next.x || prev.y !== next.y) return false;
-    if (prev.strokes.length !== next.strokes.length) return false;
     if (prev.onNodeRef !== next.onNodeRef) return false;
-    // Check if stroke or selection references are identical
-    if (prev.strokes !== next.strokes) return false;
     
-    // If strokes are identical, we only need to re-render if the selection status of any stroke in this tile changed
+    if (prev.strokes.length !== next.strokes.length) return false;
+    
+    // Check if the actual strokes are different by ID or updatedAt
+    for (let i = 0; i < prev.strokes.length; i++) {
+        const prevStroke = prev.strokes[i];
+        const nextStroke = next.strokes[i];
+        if (prevStroke.id !== nextStroke.id || prevStroke.updatedAt !== nextStroke.updatedAt) {
+            return false;
+        }
+    }
+    
+    // Check if selection status changed for any stroke in this tile
     const prevSelectedCount = prev.strokes.filter(s => prev.selectedIds.includes(s.id)).length;
     const nextSelectedCount = next.strokes.filter(s => next.selectedIds.includes(s.id)).length;
     
     if (prevSelectedCount !== nextSelectedCount) return false;
     
-    // Fallback: If we had selected items and their selection state changed
     const prevSelectedInTile = prev.selectedIds.filter(id => prev.strokes.some(s => s.id === id));
     const nextSelectedInTile = next.selectedIds.filter(id => next.strokes.some(s => s.id === id));
     

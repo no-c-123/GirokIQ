@@ -134,10 +134,16 @@ export const useBlockStore = create<BlockState>((set, get) => ({
     });
   },
 
-  updateBlockSize: (id, width, height) =>
+  updateBlockSize: (id, width, height) => {
     set((state) => ({
       blocks: state.blocks.map((b) => (b.id === id ? { ...b, width, height, updatedAt: Date.now() } : b)),
-    })),
+    }));
+    db.canvasElements.get(id).then(existing => {
+      if (existing) {
+        db.canvasElements.put({ ...existing, width, height, updatedAt: Date.now() });
+      }
+    });
+  },
 
   commitBlockPosition: async (id) => {
     const block = get().blocks.find((b) => b.id === id);

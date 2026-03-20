@@ -189,15 +189,21 @@ class SyncService {
     const base = {
       id: r.id,
       user_id: this.userId,
-      device_id: DEVICE_ID,
       created_at: r.createdAt ? new Date(r.createdAt).toISOString() : undefined,
       updated_at: r.updatedAt ? new Date(r.updatedAt).toISOString() : new Date().toISOString(),
+    };
+    
+    // Add device_id and deleted only for tables that support it
+    const withDeviceAndDeleted = {
+      ...base,
+      device_id: DEVICE_ID,
       deleted: r.deleted ?? false,
     };
+
     switch (table) {
-      case "strokes": return { ...base, page_id: r.pageId, points: r.points, color: r.color, width: r.strokeWidth ?? r.width };
-      case "canvas_elements": return { ...base, page_id: r.pageId, type: r.type, x: r.x, y: r.y, width: r.width, height: r.height, rotation: r.rotation, data: r.data };
-      case "pages": return { ...base, notebook_id: r.notebookId, title: r.title, type: r.type, settings: r.settings };
+      case "strokes": return { ...withDeviceAndDeleted, page_id: r.pageId, points: r.points ? pointsToHex(r.points) : null, color: r.color, width: r.strokeWidth ?? r.width };
+      case "canvas_elements": return { ...withDeviceAndDeleted, page_id: r.pageId, type: r.type, x: r.x, y: r.y, width: r.width, height: r.height, rotation: r.rotation, z_index: r.zIndex, data: r.data };
+      case "pages": return { ...base, notebook_id: r.notebookId, title: r.title, type: r.type, settings: r.settings, page_index: r.pageIndex };
       case "folders": return { ...base, parent_id: r.parentId, name: r.name };
       case "notebooks": return { ...base, folder_id: r.folderId, name: r.name };
       default: return { ...base, ...r };
@@ -215,13 +221,27 @@ class SyncService {
     };
     switch (dexieTable) {
       case "strokes": return { ...base, pageId: row.page_id, points: parsePoints(row.points), color: row.color, strokeWidth: row.width, width: 0, height: 0 };
-      case "canvasElements": return { ...base, pageId: row.page_id, type: row.type, x: row.x, y: row.y, width: row.width, height: row.height, rotation: row.rotation, data: row.data };
-      case "pages": return { ...base, notebookId: row.notebook_id, title: row.title, type: row.type, settings: row.settings };
+      case "canvasElements": return { ...base, pageId: row.page_id, type: row.type, x: row.x, y: row.y, width: row.width, height: row.height, rotation: row.rotation, zIndex: row.z_index, data: row.data };
+      case "pages": return { ...base, notebookId: row.notebook_id, title: row.title, type: row.type, settings: row.settings, pageIndex: row.page_index };
       case "folders": return { ...base, parentId: row.parent_id, name: row.name };
       case "notebooks": return { ...base, folderId: row.folder_id, name: row.name };
       default: return { ...base, ...row };
     }
   }
+}
+
+function pointsToHex(points: number[] | Uint8Array): string {
+  let str = "";
+  if (points instanceof Uint8Array) {
+    str = new TextDecoder().decode(points);
+  } else {
+    str = JSON.stringify(points);
+  }
+  let hex = "\\x";
+  for (let i = 0; i < str.length; i++) {
+    hex += str.charCodeAt(i).toString(16).padStart(2, "0");
+  }
+  return hex;
 }
 
 function chunk<T>(arr: T[], size: number): T[][] {
