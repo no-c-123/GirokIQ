@@ -5,6 +5,7 @@ import '@/index.css'
 import { LoginPage } from '@/ui/components/LoginPage.tsx'
 import App from '@/app/App.tsx'
 import { useAuthStore } from '@/store/useAuthStore'
+import { Analytics } from '@vercel/analytics/react'
 
 function AppRoutes() {
   const { session, initialize, loading } = useAuthStore();
@@ -45,6 +46,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <AppRoutes />
+      <Analytics />
     </BrowserRouter>
   </StrictMode>,
 )
