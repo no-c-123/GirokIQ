@@ -137,6 +137,8 @@ export default function CanvasArea({
   const lastPanPositionRef = useRef<{ x: number; y: number } | null>(null);
   const lastGestureCenterRef = useRef<{ x: number; y: number } | null>(null);
   const lastGestureDistanceRef = useRef<number | null>(null);
+  const activePenPointerIdRef = useRef<number | null>(null);
+  const isPenActiveRef = useRef(false);
   const [selectionRectangle, setSelectionRectangle] = useState({ 
     visible: false, 
     x1: 0, 
@@ -588,6 +590,9 @@ export default function CanvasArea({
     useSelectionStore.getState().clearSelection();
 
     if (tool === "eraser") {
+      if ((e.evt as any).pointerType !== "pen") return;
+      activePenPointerIdRef.current = (e.evt as any).pointerId ?? null;
+      isPenActiveRef.current = true;
       isErasingRef.current = true;
       const erased = eraseAtPoint(activePageId, localPoint);
       if (erased) historyPush({ type: "DELETE_STROKE", stroke: erased });
@@ -596,6 +601,9 @@ export default function CanvasArea({
 
     const isDrawingTool = ["pen", "rectangle", "diamond", "ellipse", "arrow", "line"].includes(tool);
     if (!isDrawingTool) return;
+    if ((e.evt as any).pointerType !== "pen") return;
+    activePenPointerIdRef.current = (e.evt as any).pointerId ?? null;
+    isPenActiveRef.current = true;
 
     const stroke = {
       id: generateId(),
@@ -662,6 +670,7 @@ export default function CanvasArea({
 
     e.evt.preventDefault();
     if (isGestureRef.current) return;
+    if (isPenActiveRef.current && (e.evt as any).pointerType !== "pen") return;
 
     if (isPanningRef.current && lastPanPositionRef.current) {
       const dx = e.evt.clientX - lastPanPositionRef.current.x;
@@ -745,6 +754,10 @@ export default function CanvasArea({
     }
 
     isPointerDownRef.current = false;
+    if (activePenPointerIdRef.current !== null && (e.evt as any).pointerId === activePenPointerIdRef.current) {
+      activePenPointerIdRef.current = null;
+      isPenActiveRef.current = false;
+    }
 
     if (isSelecting.current) {
       isSelecting.current = false;
@@ -982,6 +995,7 @@ export default function CanvasArea({
             }
           }}
           onTouchStart={(e) => {
+            if (isPenActiveRef.current) return;
             if (e.evt.touches.length !== 2) {
               isGestureRef.current = false;
               lastGestureCenterRef.current = null;
@@ -1006,6 +1020,7 @@ export default function CanvasArea({
             lastGestureDistanceRef.current = Math.hypot(dx, dy);
           }}
           onTouchMove={(e) => {
+            if (isPenActiveRef.current) return;
             if (e.evt.touches.length !== 2) return;
             e.evt.preventDefault();
 

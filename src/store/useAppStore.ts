@@ -132,6 +132,11 @@ export const useAppStore = create<AppState>((set) => ({
       updatedAt: Date.now(),
     });
 
+    // Notify SyncService of new page
+    import("@/sync/sync").then(({ syncService }) => {
+      syncService.queuePush("pages", page);
+    });
+
     set((state) => ({
       pages: [...state.pages, page],
       activePageId: page.id,
@@ -144,6 +149,11 @@ export const useAppStore = create<AppState>((set) => ({
 
     const updated = { ...existing, ...updates, updatedAt: Date.now() };
     await db.pages.put(updated);
+
+    // Notify SyncService of updated page
+    import("@/sync/sync").then(({ syncService }) => {
+      syncService.queuePush("pages", updated);
+    });
 
     set((state) => ({
       pages: state.pages.map((p) => (p.id === id ? updated : p)),

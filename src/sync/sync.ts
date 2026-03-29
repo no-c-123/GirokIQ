@@ -203,9 +203,9 @@ class SyncService {
     switch (table) {
       case "strokes": return { ...withDeviceAndDeleted, page_id: r.pageId, points: r.points ? pointsToHex(r.points) : null, color: r.color, width: r.strokeWidth ?? r.width };
       case "canvas_elements": return { ...withDeviceAndDeleted, page_id: r.pageId, type: r.type, x: r.x, y: r.y, width: r.width, height: r.height, rotation: r.rotation, z_index: r.zIndex, data: r.data };
-      case "pages": return { ...base, notebook_id: r.notebookId, title: r.title, type: r.type, settings: r.settings, page_index: r.pageIndex };
-      case "folders": return { ...base, parent_id: r.parentId, name: r.name };
-      case "notebooks": return { ...base, folder_id: r.folderId, name: r.name };
+      case "pages": return { ...base, notebook_id: r.notebookId, title: r.title, type: r.type, settings: r.settings, page_index: r.pageIndex || 0, deleted: r.deleted ?? false };
+      case "folders": return { ...base, parent_id: r.parentId, name: r.name, deleted: r.deleted ?? false };
+      case "notebooks": return { ...base, folder_id: r.folderId, name: r.name, deleted: r.deleted ?? false };
       default: return { ...base, ...r };
     }
   }

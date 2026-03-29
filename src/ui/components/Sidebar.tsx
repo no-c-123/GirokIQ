@@ -123,21 +123,21 @@ export function Sidebar() {
 
   return (
     <>
-      <aside className="layout-sidebar h-full w-70 flex flex-col backdrop-blur-xl text-[var(--text-secondary)] transition-colors duration-300">
+      <aside className="layout-sidebar h-full w-70 flex flex-col backdrop-blur-xl text-(--text-secondary) transition-colors duration-300">
         {/* Header */}
         <div className="p-4 pt-6">
           <div className="flex items-center gap-2 mb-6 px-2">
             <img src="/girok-iq-logo.png" alt="GirokIQ Logo" className="w-8 h-8 object-contain" />
-            <span className="font-medium text-[var(--text-primary)] tracking-tight">GirokIQ</span>
+            <span className="font-medium text-(--text-primary) tracking-tight">GirokIQ</span>
           </div>
 
           {/* Search */}
           <div className="relative group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-tertiary)] group-focus-within:text-[var(--accent-primary)] transition-colors" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-(--text-tertiary) group-focus-within:text-(--accent-primary) transition-colors" />
             <input 
               type="text" 
               placeholder="Search..." 
-              className="w-full bg-[var(--bg-panel)] border border-[var(--border-subtle)] rounded-lg py-2 pl-9 pr-3 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]/30 focus:bg-[var(--accent-subtle)]/10 transition-all placeholder:text-[var(--text-tertiary)]"
+              className="w-full bg-(--bg-panel) border border-(--border-subtle) rounded-lg py-2 pl-9 pr-3 text-sm text-(--text-primary) focus:outline-none focus:border-(--accent-primary)/30 focus:bg-(--accent-subtle)/10 transition-all placeholder:text-(--text-tertiary)"
             />
           </div>
         </div>
@@ -145,7 +145,7 @@ export function Sidebar() {
         {/* Navigation Tree */}
         <div className="flex-1 overflow-y-auto px-2 py-2 scrollbar-thin scrollbar-thumb-[var(--border-strong)] scrollbar-track-transparent">
           <div className="space-y-0.5">
-            <div className="px-3 py-1.5 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider mb-1">
+            <div className="px-3 py-1.5 text-xs font-medium text-(--text-tertiary) uppercase tracking-wider mb-1">
               Library
             </div>
             
@@ -188,37 +188,37 @@ export function Sidebar() {
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 border-t border-[var(--border-subtle)] space-y-1 bg-[var(--bg-sidebar)]">
+        <div className="p-4 border-t border-(--border-subtle) space-y-1 bg-(--bg-sidebar)">
           <div className="grid grid-cols-2 gap-2 mb-2">
             <button 
               onClick={() => setNamingModal({ isOpen: true, type: "folder", mode: "create" })}
-              className="flex items-center justify-center gap-2 py-2 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-panel)] border border-[var(--border-subtle)] rounded-lg transition-all active:scale-95 group shadow-sm"
+              className="flex items-center justify-center gap-2 py-2 text-xs font-medium text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-panel) border border-(--border-subtle) rounded-lg transition-all active:scale-95 group shadow-sm"
               title="New Folder"
             >
-              <FolderPlus className="w-3.5 h-3.5 group-hover:text-[var(--accent-primary)] transition-colors" />
+              <FolderPlus className="w-3.5 h-3.5 group-hover:text-(--accent-primary) transition-colors" />
               <span>Folder</span>
             </button>
             <button 
               onClick={() => setNamingModal({ isOpen: true, type: "notebook", mode: "create" })}
-              className="flex items-center justify-center gap-2 py-2 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-panel)] border border-[var(--border-subtle)] rounded-lg transition-all active:scale-95 group shadow-sm"
+              className="flex items-center justify-center gap-2 py-2 text-xs font-medium text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-panel) border border-(--border-subtle) rounded-lg transition-all active:scale-95 group shadow-sm"
               title="New Notebook"
             >
-              <BookPlus className="w-3.5 h-3.5 group-hover:text-[var(--accent-primary)] transition-colors" />
+              <BookPlus className="w-3.5 h-3.5 group-hover:text-(--accent-primary) transition-colors" />
               <span>Notebook</span>
             </button>
           </div>
           <button 
             onClick={() => setShowSettings(true)}
-            className="flex items-center gap-3 w-full px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-panel)] rounded-lg transition-all group"
+            className="flex items-center gap-3 w-full px-3 py-2 text-sm text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-panel) rounded-lg transition-all group"
           >
-            <Settings className="w-4 h-4 group-hover:text-[var(--accent-primary)] transition-colors" />
+            <Settings className="w-4 h-4 group-hover:text-(--accent-primary) transition-colors" />
             <span>Settings</span>
           </button>
           <button 
             onClick={() => handleNewPage()}
-            className="flex items-center gap-3 w-full px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-panel)] rounded-lg transition-all group"
+            className="flex items-center gap-3 w-full px-3 py-2 text-sm text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-panel) rounded-lg transition-all group"
           >
-            <Plus className="w-4 h-4 group-hover:text-[var(--accent-primary)] transition-colors" />
+            <Plus className="w-4 h-4 group-hover:text-(--accent-primary) transition-colors" />
             <span>New Page</span>
           </button>
         </div>
@@ -264,12 +264,12 @@ function FolderItem({ folder, notebooks, pages, activePageId, onPageSelect, onDe
       <div className="flex items-center group/folder">
         <button 
           onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center flex-1 px-2 py-1.5 text-sm rounded-md hover:bg-[var(--bg-panel)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors group"
+          className="flex items-center flex-1 px-2 py-1.5 text-sm rounded-md hover:bg-(--bg-panel) text-(--text-secondary) hover:text-(--text-primary) transition-colors group"
         >
-          <span className="mr-1 opacity-50 group-hover:opacity-100 transition-opacity text-[var(--text-tertiary)]">
+          <span className="mr-1 opacity-50 group-hover:opacity-100 transition-opacity text-(--text-tertiary)">
             {isOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
           </span>
-          <FolderIcon className="w-4 h-4 mr-2 text-[var(--text-tertiary)] group-hover:text-[var(--accent-primary)] transition-colors" />
+          <FolderIcon className="w-4 h-4 mr-2 text-(--text-tertiary) group-hover:text-(--accent-primary) transition-colors" />
           <span className="truncate font-medium">{folder.name}</span>
         </button>
         <div className="flex items-center opacity-0 group-hover/folder:opacity-100 transition-opacity">
@@ -356,12 +356,12 @@ function NotebookItem({ notebook, pages, activePageId, onPageSelect, onDeletePag
       <div className="flex items-center group/notebook">
         <button 
           onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center flex-1 px-2 py-1.5 text-sm rounded-md hover:bg-[var(--bg-panel)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors group"
+          className="flex items-center flex-1 px-2 py-1.5 text-sm rounded-md hover:bg-(--bg-panel) text-(--text-secondary) hover:text-(--text-primary) transition-colors group"
         >
-          <span className="mr-1 opacity-50 group-hover:opacity-100 transition-opacity text-[var(--text-tertiary)]">
+          <span className="mr-1 opacity-50 group-hover:opacity-100 transition-opacity text-(--text-tertiary)">
             {isOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
           </span>
-          <Book className="w-3.5 h-3.5 mr-2 text-[var(--text-tertiary)] group-hover:text-[var(--accent-primary)]/70 transition-colors" />
+          <Book className="w-3.5 h-3.5 mr-2 text-(--text-tertiary) group-hover:text-(--accent-primary)/70 transition-colors" />
           <span className="truncate">{notebook.name}</span>
         </button>
         <div className="flex items-center opacity-0 group-hover/notebook:opacity-100 transition-opacity">
@@ -438,19 +438,19 @@ function PageItem({ page, isActive, onSelect, onDelete, onRename }: {
       className={cn(
         "flex items-center w-full px-2 py-1.5 rounded-md transition-all group relative cursor-pointer select-none",
         isActive 
-          ? "bg-[var(--accent-subtle)]/50 text-[var(--accent-hover)] font-medium" 
-          : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-panel)]"
+          ? "bg-(--accent-subtle)/50 text-(--accent-hover) font-medium" 
+          : "text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-panel)"
       )}
     >
       {isActive && (
         <motion.div 
           layoutId="active-indicator"
-          className="absolute left-0 w-0.5 h-4 bg-[var(--accent-primary)] rounded-full shadow-[0_0_12px_rgba(129,140,248,0.8)]"
+          className="absolute left-0 w-0.5 h-4 bg-(--accent-primary) rounded-full shadow-[0_0_12px_rgba(129,140,248,0.8)]"
         />
       )}
       <FileText className={cn(
         "w-3.5 h-3.5 mr-2 transition-colors",
-        isActive ? "text-[var(--accent-primary)]" : "text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)]"
+        isActive ? "text-(--accent-primary)" : "text-(--text-tertiary) group-hover:text-(--text-secondary)"
       )} />
       <span className="truncate text-[13px]">{page.title}</span>
       

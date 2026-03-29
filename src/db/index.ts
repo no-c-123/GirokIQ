@@ -3,6 +3,8 @@ import type { Folder } from "@/data/models/folder";
 import type { Notebook } from "@/data/models/notebook";
 import type { Page } from "@/data/models/page";
 import type { CanvasElement } from "@/data/models/canvas";
+import type { Chat } from "@/data/models/chat";
+import type { Message } from "@/data/models/message";
 import { generateId } from "@/utils";
 
 export interface StrokeRow {
@@ -42,6 +44,8 @@ export class AppDB extends Dexie {
   strokes!: Table<StrokeRow, string>;
   appState!: Table<AppStateRow, string>;
   pendingDeletes!: Table<PendingDelete, number>;
+  chats!: Table<Chat, string>;
+  messages!: Table<Message, string>;
 
   constructor() {
     super("syllabus-db");
@@ -157,7 +161,13 @@ export class AppDB extends Dexie {
       strokes: "id, pageId, userId, updatedAt, syncedAt",
       appState: "key, updatedAt",
       pendingDeletes: "++id, tableName, recordId"
-      });
+    });
+
+    // V7: Add chats and messages
+    this.version(7).stores({
+      chats: "id, userId, createdAt, updatedAt, syncedAt",
+      messages: "id, chatId, userId, role, createdAt, updatedAt, syncedAt"
+    });
   }
 }
 

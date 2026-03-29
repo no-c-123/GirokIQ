@@ -11,6 +11,8 @@ import {
   Type, 
   Sidebar as SidebarIcon,
   Grid,
+  PanelRightIcon,
+  PanelLeftIcon
 } from "lucide-react";
 import { cn } from "@/utils";
 import CanvasArea from "@/editor/CanvasArea";
@@ -22,6 +24,7 @@ import type { Page } from "@/data/models/page";
 import type { Notebook } from "@/data/models/notebook";
 import { Toolbar } from "@/ui/toolbar/Toolbar";
 import { PropertiesPanel } from "@/ui/properties/PropertiesPanel";
+import { ChatBot } from "../ui/components/ChatBot";
 
 interface EditorProps {
   page?: Page;
@@ -38,6 +41,7 @@ export function Editor({ page, notebook }: EditorProps) {
 
   const sidebarVisible = useAppStore((s) => s.sidebarVisible);
   const setSidebarVisible = useAppStore((s) => s.setSidebarVisible);
+
   const updatePage = useAppStore((s) => s.updatePage);
 
   const blocks = useBlockStore((s) => s.blocks);
@@ -52,6 +56,7 @@ export function Editor({ page, notebook }: EditorProps) {
   const undo = useHistoryStore((s) => s.undo);
   const redo = useHistoryStore((s) => s.redo);
   const historyClear = useHistoryStore((s) => s.clear);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   useEffect(() => {
     const isEditableTarget = (target: EventTarget | null) => {
@@ -238,6 +243,13 @@ export function Editor({ page, notebook }: EditorProps) {
             onClick={() => setIsFullscreen(!isFullscreen)}
             tooltip="Toggle Fullscreen" 
           />
+          <ToolbarButton
+            icon={isChatOpen ? PanelLeftIcon : PanelRightIcon}
+            onClick={() => setIsChatOpen(!isChatOpen)}
+            tooltip={isChatOpen ? "Close Chat" : "Open Chat"}
+            active={isChatOpen}
+          />
+          
           <div className="relative">
             <ToolbarButton 
               icon={MoreHorizontal} 
@@ -295,50 +307,55 @@ export function Editor({ page, notebook }: EditorProps) {
         </div>
       </header>
 
-      {/* Main Canvas Area */}
-      <div className="flex-1 relative overflow-hidden bg-(--bg-canvas)">
-        
-        {/* Properties Panel */}
-        {page.type === "canvas" && (
-            <div className="absolute top-4 left-4 z-20">
-                <PropertiesPanel />
-            </div>
-        )}
-
-        <div className="absolute inset-0">
-          {page.type === "document" ? (
-            <div className="h-full w-full max-w-4xl mx-auto p-12 md:p-24 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
-              <textarea
-                className="w-full h-full bg-transparent text-zinc-100 placeholder:text-zinc-800 text-lg leading-relaxed outline-none resize-none"
-                placeholder="Start typing your notes here..."
-                value={blocks[0]?.data.content || ""}
-                onChange={async (e) => {
-                  if (blocks.length === 0) {
-                    const block = await addTextBlock(page.id, 0, 0);
-                    void useBlockStore.getState().updateBlock(block.id, e.target.value);
-                  } else {
-                    void useBlockStore.getState().updateBlock(blocks[0].id, e.target.value);
-                  }
-                }}
-              />
-            </div>
-          ) : (
-            <CanvasArea
-              onDoubleClickPage={(pageId, x, y) => {
-                void addTextBlock(pageId, x, y).then((block) => {
-                  historyPush({ type: "ADD_BLOCK", block });
-                });
-              }}
-            >
-              {blocks.map((block) => {
-                if (block.type === "text") {
-                  return <TextBlock key={block.id} block={block} />;
-                }
-                return null;
-              })}
-            </CanvasArea>
+      {/* Content Area */}
+      <div className="flex-1 flex flex-row relative overflow-hidden">
+        {/* Main Canvas Area */}
+        <div className="flex-1 relative overflow-hidden bg-(--bg-canvas)">
+          
+          {/* Properties Panel */}
+          {page.type === "canvas" && (
+              <div className="absolute top-4 left-4 z-20">
+                  <PropertiesPanel />
+              </div>
           )}
+
+          <div className="absolute inset-0">
+            {page.type === "document" ? (
+              <div className="h-full w-full max-w-4xl mx-auto p-12 md:p-24 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+                <textarea
+                  className="w-full h-full bg-transparent text-zinc-100 placeholder:text-zinc-800 text-lg leading-relaxed outline-none resize-none"
+                  placeholder="Start typing your notes here..."
+                  value={blocks[0]?.data.content || ""}
+                  onChange={async (e) => {
+                    if (blocks.length === 0) {
+                      const block = await addTextBlock(page.id, 0, 0);
+                      void useBlockStore.getState().updateBlock(block.id, e.target.value);
+                    } else {
+                      void useBlockStore.getState().updateBlock(blocks[0].id, e.target.value);
+                    }
+                  }}
+                />
+              </div>
+            ) : (
+              <CanvasArea
+                onDoubleClickPage={(pageId, x, y) => {
+                  void addTextBlock(pageId, x, y).then((block) => {
+                    historyPush({ type: "ADD_BLOCK", block });
+                  });
+                }}
+              >
+                {blocks.map((block) => {
+                  if (block.type === "text") {
+                    return <TextBlock key={block.id} block={block} />;
+                  }
+                  return null;
+                })}
+              </CanvasArea>
+            )}
+          </div>
         </div>
+        
+        {isChatOpen && <ChatBot />}
       </div>
     </div>
   );
