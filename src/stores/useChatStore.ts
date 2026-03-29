@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { db } from '@/db';
 import { generateId } from '@/utils';
 import type { Chat } from '@/data/models/chat';
-import type { Message, MessageRole } from '@/data/models/message';
+import type { Message } from '@/data/models/message';
 
 interface ChatState {
   chats: Chat[];
