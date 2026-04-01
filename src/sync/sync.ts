@@ -180,12 +180,18 @@ class SyncService {
       const local = await (db as any)[dexieTable].get(row.id);
       const remoteUpdated = new Date(row.updated_at).getTime();
       if (!local || remoteUpdated > (local.updatedAt ?? 0)) {
-        await (db as any)[dexieTable].put(this.fromSupabase(dexieTable, row));
+        const mapped = this.fromSupabase(dexieTable, row);
+        if (mapped) {
+          await (db as any)[dexieTable].put(mapped);
+        }
       }
     }
   }
 
   private toSupabase(table: string, r: any): any {
+    // Data validation before push to prevent sync corruption
+    if (!r.id || typeof r.id !== 'string') throw new Error(`Invalid id for table ${table}`);
+    
     const base = {
       id: r.id,
       user_id: this.userId,
@@ -201,7 +207,21 @@ class SyncService {
     };
 
     switch (table) {
-      case "strokes": return { ...withDeviceAndDeleted, page_id: r.pageId, points: r.points ? pointsToHex(r.points) : null, color: r.color, width: r.strokeWidth ?? r.width };
+      case "strokes": return { 
+        ...withDeviceAndDeleted, 
+        page_id: r.pageId, 
+        points: r.points ? pointsToHex(r.points) : null, 
+        color: r.color, 
+        width: r.strokeWidth ?? r.width,
+        pressures: r.pressures,
+        shape_type: r.shapeType,
+        original_points: r.originalPoints ? pointsToHex(r.originalPoints) : null,
+        stroke_style: r.strokeStyle,
+        background_color: r.backgroundColor,
+        opacity: r.opacity,
+        edges: r.edges,
+        sloppiness: r.sloppiness
+      };
       case "canvas_elements": return { ...withDeviceAndDeleted, page_id: r.pageId, type: r.type, x: r.x, y: r.y, width: r.width, height: r.height, rotation: r.rotation, z_index: r.zIndex, data: r.data };
       case "pages": return { ...base, notebook_id: r.notebookId, title: r.title, type: r.type, settings: r.settings, page_index: r.pageIndex || 0, deleted: r.deleted ?? false };
       case "folders": return { ...base, parent_id: r.parentId, name: r.name, deleted: r.deleted ?? false };
@@ -211,6 +231,12 @@ class SyncService {
   }
 
   private fromSupabase(dexieTable: string, row: any): any {
+    // Data validation to prevent corruption from incoming sync data
+    if (!row.id || typeof row.id !== 'string') {
+      console.warn(`Invalid incoming sync data: missing id`, row);
+      return null;
+    }
+    
     const base = {
       id: row.id,
       userId: row.user_id,
@@ -220,7 +246,23 @@ class SyncService {
       deleted: row.deleted ?? false,
     };
     switch (dexieTable) {
-      case "strokes": return { ...base, pageId: row.page_id, points: parsePoints(row.points), color: row.color, strokeWidth: row.width, width: 0, height: 0 };
+      case "strokes": return { 
+        ...base, 
+        pageId: row.page_id, 
+        points: parsePoints(row.points), 
+        color: row.color, 
+        strokeWidth: row.width, 
+        width: 0, 
+        height: 0,
+        pressures: row.pressures || [],
+        shapeType: row.shape_type,
+        originalPoints: row.original_points ? parsePoints(row.original_points) : undefined,
+        strokeStyle: row.stroke_style,
+        backgroundColor: row.background_color,
+        opacity: row.opacity,
+        edges: row.edges,
+        sloppiness: row.sloppiness
+      };
       case "canvasElements": return { ...base, pageId: row.page_id, type: row.type, x: row.x, y: row.y, width: row.width, height: row.height, rotation: row.rotation, zIndex: row.z_index, data: row.data };
       case "pages": return { ...base, notebookId: row.notebook_id, title: row.title, type: row.type, settings: row.settings, pageIndex: row.page_index };
       case "folders": return { ...base, parentId: row.parent_id, name: row.name };

@@ -1,7 +1,7 @@
 import { Layer, Rect, Transformer, Path, Group } from "react-konva";
 import { useEffect, useRef } from "react";
 import Konva from "konva";
-import { getPathData } from "@/core/layers/DrawingLayer";
+import { getPathData, isPolygonStroke } from "@/core/layers/DrawingLayer";
 import type { StrokeElement } from "@/elements/types";
 
 interface SelectionLayerProps {
@@ -176,6 +176,7 @@ export function SelectionLayer({
             };
 
             const pathData = getPathData(offsetStroke);
+            const isPolygon = isPolygonStroke(offsetStroke);
             return (
               <Path
                 key={stroke.id}
@@ -184,11 +185,11 @@ export function SelectionLayer({
                 x={0}
                 y={0}
                 data={pathData}
-                stroke={stroke.color}
-                strokeWidth={Number.isFinite(stroke.strokeWidth) ? stroke.strokeWidth : 2}
-                dash={stroke.strokeStyle === "dashed" ? [10, 10] : stroke.strokeStyle === "dotted" ? [5, 5] : undefined}
+                stroke={isPolygon ? undefined : stroke.color}
+                fill={isPolygon ? stroke.color : (stroke.backgroundColor && stroke.backgroundColor !== "transparent" ? stroke.backgroundColor : undefined)}
+                strokeWidth={isPolygon ? 0 : (Number.isFinite(stroke.strokeWidth) ? stroke.strokeWidth : 2)}
+                dash={!isPolygon && stroke.strokeStyle === "dashed" ? [10, 10] : !isPolygon && stroke.strokeStyle === "dotted" ? [5, 5] : undefined}
                 opacity={stroke.opacity ? stroke.opacity / 100 : 1}
-                fill={stroke.backgroundColor && stroke.backgroundColor !== "transparent" ? stroke.backgroundColor : undefined}
                 lineCap="round"
                 lineJoin="round"
                 perfectDrawEnabled={false}

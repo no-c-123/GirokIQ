@@ -590,9 +590,13 @@ export default function CanvasArea({
     useSelectionStore.getState().clearSelection();
 
     if (tool === "eraser") {
-      if ((e.evt as any).pointerType !== "pen") return;
-      activePenPointerIdRef.current = (e.evt as any).pointerId ?? null;
-      isPenActiveRef.current = true;
+      if ((e.evt as any).pointerType === "pen") {
+        activePenPointerIdRef.current = (e.evt as any).pointerId ?? null;
+        isPenActiveRef.current = true;
+      } else if (isPenActiveRef.current) {
+        return;
+      }
+      
       isErasingRef.current = true;
       const erased = eraseAtPoint(activePageId, localPoint);
       if (erased) historyPush({ type: "DELETE_STROKE", stroke: erased });
@@ -601,9 +605,17 @@ export default function CanvasArea({
 
     const isDrawingTool = ["pen", "rectangle", "diamond", "ellipse", "arrow", "line"].includes(tool);
     if (!isDrawingTool) return;
-    if ((e.evt as any).pointerType !== "pen") return;
-    activePenPointerIdRef.current = (e.evt as any).pointerId ?? null;
-    isPenActiveRef.current = true;
+    
+    // Palm rejection: if pen was recently used, ignore touch
+    if ((e.evt as any).pointerType === "pen") {
+      activePenPointerIdRef.current = (e.evt as any).pointerId ?? null;
+      isPenActiveRef.current = true;
+    } else if (isPenActiveRef.current) {
+      // Ignore touch if pen is active
+      return;
+    }
+
+    const initialPressure = (e.evt as PointerEvent).pressure !== undefined ? (e.evt as PointerEvent).pressure : 0.5;
 
     const stroke = {
       id: generateId(),
@@ -615,7 +627,7 @@ export default function CanvasArea({
       height: 0,
       x: localPoint.x,
       y: localPoint.y,
-      pressures: [0.5],
+      pressures: [initialPressure],
       shapeType: tool === "pen" ? undefined : tool,
       strokeStyle,
       opacity,
@@ -713,10 +725,13 @@ export default function CanvasArea({
       : [e.evt];
 
     const newPoints: number[] = [];
+    const newPressures: number[] = [];
     for (const evt of rawEvents) {
       const cp = getContainerPoint(evt);
       if (!cp) continue;
       const lp = getStagePoint(cp, view.zoom, view.position);
+      const pressure = evt.pressure !== undefined ? evt.pressure : 0.5;
+
       if (tempPointsRef.current.length >= 2) {
         const lastX = tempPointsRef.current[tempPointsRef.current.length - 2];
         const lastY = tempPointsRef.current[tempPointsRef.current.length - 1];
@@ -731,6 +746,7 @@ export default function CanvasArea({
         if (dx * dx + dy * dy < 0.25) continue;
       }
       newPoints.push(lp.x, lp.y);
+      newPressures.push(pressure);
       tempPointsRef.current.push(lp.x, lp.y);
     }
 
@@ -739,7 +755,11 @@ export default function CanvasArea({
       if (!snapHook.isSnapping) {
         setTempStroke((prev: any) => {
           if (!prev) return null;
-          return { ...prev, points: [...tempPointsRef.current] };
+          return { 
+            ...prev, 
+            points: [...tempPointsRef.current],
+            pressures: [...(prev.pressures || []), ...newPressures]
+          };
         });
       }
     }
@@ -756,7 +776,10 @@ export default function CanvasArea({
     isPointerDownRef.current = false;
     if (activePenPointerIdRef.current !== null && (e.evt as any).pointerId === activePenPointerIdRef.current) {
       activePenPointerIdRef.current = null;
-      isPenActiveRef.current = false;
+      // Palm rejection timeout: keep ignoring touches for 1s after pen lifts
+      setTimeout(() => {
+        isPenActiveRef.current = false;
+      }, 1000);
     }
 
     if (isSelecting.current) {

@@ -4,6 +4,7 @@ import { Editor } from "@/editor/Editor";
 import { NewPageModal } from "@/ui/components/NewPageModal";
 import { useAppStore } from "@/store/useAppStore";
 import { useKeyboardShortcuts } from "@/ui/hooks/useKeyboardShortcuts";
+import { CursorOverlay } from "@/ui/overlays/CursorOverlay";
 import { Plus, ArrowDown } from "lucide-react";
 
 export default function App() {
@@ -209,6 +210,7 @@ export default function App() {
         onClose={() => setShowNewPageModal(false)}
         onSelect={handleCreatePage}
       />
+      <CursorOverlay />
     </div>
   );
 }

@@ -7,6 +7,11 @@ import App from '@/app/App.tsx'
 import { useAuthStore } from '@/store/useAuthStore'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from "@vercel/speed-insights/react"
+import Konva from 'konva'
+
+// Optimize Konva for iOS / WebGL constraints
+Konva.pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+Konva.hitOnDragEnabled = false;
 
 function AppRoutes() {
   const { session, initialize, loading } = useAuthStore();

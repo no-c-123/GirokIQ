@@ -3,11 +3,6 @@ import {
   Lock, 
   Hand, 
   MousePointer2, 
-  Square, 
-  Diamond, 
-  Circle, 
-  ArrowRight, 
-  Minus, 
   Pen, 
   Type, 
   Image as ImageIcon, 
@@ -42,36 +37,6 @@ export function Toolbar() {
         active={tool === "select"} 
         onClick={() => setTool("select")}
         tooltip="Select"
-      />
-      <ToolButton 
-        icon={Square} 
-        active={tool === "rectangle"} 
-        onClick={() => setTool("rectangle")}
-        tooltip="Rectangle"
-      />
-      <ToolButton 
-        icon={Diamond} 
-        active={tool === "diamond"} 
-        onClick={() => setTool("diamond")}
-        tooltip="Diamond"
-      />
-      <ToolButton 
-        icon={Circle} 
-        active={tool === "ellipse"} 
-        onClick={() => setTool("ellipse")}
-        tooltip="Ellipse"
-      />
-      <ToolButton 
-        icon={ArrowRight} 
-        active={tool === "arrow"} 
-        onClick={() => setTool("arrow")}
-        tooltip="Arrow"
-      />
-      <ToolButton 
-        icon={Minus} 
-        active={tool === "line"} 
-        onClick={() => setTool("line")}
-        tooltip="Line"
       />
       <ToolButton 
         icon={Pen} 
@@ -116,14 +81,14 @@ function ToolButton({
     <button 
       onClick={onClick}
       className={cn(
-        "p-2 rounded-md transition-colors",
+        "p-3 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md transition-colors",
         active 
           ? "bg-[var(--accent-subtle)]/20 text-[var(--accent-primary)]" 
           : "text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-canvas)]"
       )}
       title={tooltip}
     >
-      <Icon className="w-4 h-4" />
+      <Icon className="w-5 h-5" />
     </button>
   );
 }

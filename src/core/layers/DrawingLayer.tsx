@@ -4,6 +4,7 @@ import { useMemo, useRef, useEffect, memo, useState } from "react";
 import Konva from "konva";
 import { spatialIndex } from "@/spatial/SpatialIndex";
 import { useSelectionStore } from "@/stores/useSelectionStore";
+import { getStroke } from "perfect-freehand";
 
 const TILE_SIZE = 1024;
 
@@ -18,6 +19,23 @@ interface Viewport {
 interface TileKey {
   x: number;
   y: number;
+}
+
+// Convert perfect-freehand stroke points to SVG path
+export function getSvgPathFromStroke(stroke: number[][]) {
+  if (!stroke.length) return "";
+
+  const d = stroke.reduce(
+    (acc, [x0, y0], i, arr) => {
+      const [x1, y1] = arr[(i + 1) % arr.length];
+      acc.push(x0, y0, (x0 + x1) / 2, (y0 + y1) / 2);
+      return acc;
+    },
+    ["M", ...stroke[0], "Q"]
+  );
+
+  d.push("Z");
+  return d.join(" ");
 }
 
 // Custom midpoint smoothing algorithm for standard SVG paths
@@ -46,6 +64,13 @@ export function getSmoothSvgPath(points: number[]) {
   d += ` L ${lastX} ${lastY}`;
 
   return d;
+}
+
+export function isPolygonStroke(stroke: StrokeElement) {
+  if (stroke.shapeType) return false;
+  if (!stroke.pressures || stroke.pressures.length === 0 || stroke.points.length < 4) return false;
+  const hasVariablePressure = stroke.pressures.some(p => p !== 0.5);
+  return hasVariablePressure || stroke.points.length > 10;
 }
 
 export function getPathData(stroke: StrokeElement) {
@@ -105,6 +130,33 @@ export function getPathData(stroke: StrokeElement) {
 
       return d;
   }
+  
+  // Use perfect-freehand if we have pressures, and it's a pen stroke
+  if (!stroke.shapeType && stroke.pressures && stroke.pressures.length > 0 && stroke.points.length >= 4) {
+    const formattedPoints = [];
+    for (let i = 0; i < stroke.points.length; i += 2) {
+      formattedPoints.push([
+        stroke.points[i], 
+        stroke.points[i+1], 
+        stroke.pressures[i/2] !== undefined ? stroke.pressures[i/2] : 0.5
+      ]);
+    }
+    
+    // Check if the stroke has variable pressure or is just mouse input
+    const hasVariablePressure = stroke.pressures.some(p => p !== 0.5);
+    
+    if (hasVariablePressure || stroke.points.length > 10) {
+      const outline = getStroke(formattedPoints, {
+        size: stroke.strokeWidth * 2, // Multiply by 2 to match SVG stroke width feel
+        thinning: 0.5,
+        smoothing: 0.5,
+        streamline: 0.5,
+        simulatePressure: !hasVariablePressure, // Simulate if mouse, use real if pencil
+      });
+      return getSvgPathFromStroke(outline);
+    }
+  }
+
   return getSmoothSvgPath(stroke.points);
 }
 
@@ -180,15 +232,16 @@ export function DrawingLayer({
   const currentStrokePath = useMemo(() => {
     if (!currentStroke) return null;
     const pathData = getPathData(currentStroke);
+    const isPolygon = isPolygonStroke(currentStroke);
     
     return (
       <Path
         data={pathData}
-        stroke={currentStroke.color}
-        strokeWidth={Number.isFinite(currentStroke.strokeWidth) ? currentStroke.strokeWidth : 2}
-        dash={currentStroke.strokeStyle === "dashed" ? [10, 10] : currentStroke.strokeStyle === "dotted" ? [5, 5] : undefined}
+        stroke={isPolygon ? undefined : currentStroke.color}
+        fill={isPolygon ? currentStroke.color : (currentStroke.backgroundColor && currentStroke.backgroundColor !== "transparent" ? currentStroke.backgroundColor : undefined)}
+        strokeWidth={isPolygon ? 0 : (Number.isFinite(currentStroke.strokeWidth) ? currentStroke.strokeWidth : 2)}
+        dash={!isPolygon && currentStroke.strokeStyle === "dashed" ? [10, 10] : !isPolygon && currentStroke.strokeStyle === "dotted" ? [5, 5] : undefined}
         opacity={currentStroke.opacity ? currentStroke.opacity / 100 : 1}
-        fill={currentStroke.backgroundColor && currentStroke.backgroundColor !== "transparent" ? currentStroke.backgroundColor : undefined}
         lineCap="round"
         lineJoin="round"
         perfectDrawEnabled={false}
@@ -238,17 +291,18 @@ const Tile = memo(function Tile({
     const unselectedPaths = useMemo(() => {
         return unselectedStrokes.map(stroke => {
             const pathData = getPathData(stroke);
+            const isPolygon = isPolygonStroke(stroke);
             return (
               <Path
                 key={stroke.id}
                 id={stroke.id}
                 name="stroke"
                 data={pathData}
-                stroke={stroke.color}
-                strokeWidth={Number.isFinite(stroke.strokeWidth) ? stroke.strokeWidth : (Number.isFinite(stroke.width) && stroke.width < 50 ? stroke.width : 2)}
-                dash={stroke.strokeStyle === "dashed" ? [10, 10] : stroke.strokeStyle === "dotted" ? [5, 5] : undefined}
+                stroke={isPolygon ? undefined : stroke.color}
+                fill={isPolygon ? stroke.color : (stroke.backgroundColor && stroke.backgroundColor !== "transparent" ? stroke.backgroundColor : undefined)}
+                strokeWidth={isPolygon ? 0 : (Number.isFinite(stroke.strokeWidth) ? stroke.strokeWidth : (Number.isFinite(stroke.width) && stroke.width < 50 ? stroke.width : 2))}
+                dash={!isPolygon && stroke.strokeStyle === "dashed" ? [10, 10] : !isPolygon && stroke.strokeStyle === "dotted" ? [5, 5] : undefined}
                 opacity={stroke.opacity ? stroke.opacity / 100 : 1}
-                fill={stroke.backgroundColor && stroke.backgroundColor !== "transparent" ? stroke.backgroundColor : undefined}
                 lineCap="round"
                 lineJoin="round"
                 perfectDrawEnabled={false}
@@ -275,18 +329,26 @@ const Tile = memo(function Tile({
                  const padding = 100;
                  // Use devicePixelRatio * zoom to ensure sharp rendering at current zoom level
                  // Cap the pixelRatio to prevent memory issues at very high zoom levels
+                 // iOS Safari kills web apps that use too much canvas memory.
+                 // A 1024x1024 tile at 2x ratio = 2048x2048 = 16MB per tile.
                  const pixelRatio = Math.min(
                      (window.devicePixelRatio || 1) * debouncedZoom, 
-                     5 // Cap at 5x resolution (reasonable limit for most devices)
+                     2 // Cap at 2x resolution to prevent memory crashes on iPad
                  );
                  
-                 groupRef.current.cache({
-                    x: -padding,
-                    y: -padding,
-                    width: TILE_SIZE + (padding * 2),
-                    height: TILE_SIZE + (padding * 2),
-                    pixelRatio
-                 });
+                 // Only cache if there are enough strokes to justify it,
+                 // otherwise native canvas rendering is faster and uses less memory
+                 if (unselectedStrokes.length > 5) {
+                   groupRef.current.cache({
+                      x: -padding,
+                      y: -padding,
+                      width: TILE_SIZE + (padding * 2),
+                      height: TILE_SIZE + (padding * 2),
+                      pixelRatio
+                   });
+                 } else {
+                   groupRef.current.clearCache();
+                 }
             }
         }
     }, [unselectedPaths, debouncedZoom]);

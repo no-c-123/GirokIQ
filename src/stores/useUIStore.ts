@@ -2,7 +2,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type ToolType = "pen" | "eraser" | "text" | "select" | "image" | "shape" | "hand" | "rectangle" | "diamond" | "ellipse" | "arrow" | "line";
+export type ToolType = "pen" | "eraser" | "text" | "select" | "image" | "shape" | "hand";
 
 interface UIState {
   tool: ToolType;

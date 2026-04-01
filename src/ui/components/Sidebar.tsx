@@ -123,7 +123,7 @@ export function Sidebar() {
 
   return (
     <>
-      <aside className="layout-sidebar h-full w-70 flex flex-col backdrop-blur-xl text-(--text-secondary) transition-colors duration-300">
+      <aside className="layout-sidebar h-full w-72 md:w-80 flex flex-col backdrop-blur-xl text-(--text-secondary) transition-colors duration-300">
         {/* Header */}
         <div className="p-4 pt-6">
           <div className="flex items-center gap-2 mb-6 px-2">
@@ -143,7 +143,7 @@ export function Sidebar() {
         </div>
 
         {/* Navigation Tree */}
-        <div className="flex-1 overflow-y-auto px-2 py-2 scrollbar-thin scrollbar-thumb-[var(--border-strong)] scrollbar-track-transparent">
+        <div className="flex-1 overflow-y-auto px-3 py-3 scrollbar-thin scrollbar-thumb-[var(--border-strong)] scrollbar-track-transparent touch-pan-y [-webkit-overflow-scrolling:touch]">
           <div className="space-y-0.5">
             <div className="px-3 py-1.5 text-xs font-medium text-(--text-tertiary) uppercase tracking-wider mb-1">
               Library
@@ -192,33 +192,33 @@ export function Sidebar() {
           <div className="grid grid-cols-2 gap-2 mb-2">
             <button 
               onClick={() => setNamingModal({ isOpen: true, type: "folder", mode: "create" })}
-              className="flex items-center justify-center gap-2 py-2 text-xs font-medium text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-panel) border border-(--border-subtle) rounded-lg transition-all active:scale-95 group shadow-sm"
+              className="flex items-center justify-center gap-2 py-3 min-h-[44px] text-sm font-medium text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-panel) border border-(--border-subtle) rounded-lg transition-all active:scale-95 group shadow-sm"
               title="New Folder"
             >
-              <FolderPlus className="w-3.5 h-3.5 group-hover:text-(--accent-primary) transition-colors" />
+              <FolderPlus className="w-4 h-4 group-hover:text-(--accent-primary) transition-colors" />
               <span>Folder</span>
             </button>
             <button 
               onClick={() => setNamingModal({ isOpen: true, type: "notebook", mode: "create" })}
-              className="flex items-center justify-center gap-2 py-2 text-xs font-medium text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-panel) border border-(--border-subtle) rounded-lg transition-all active:scale-95 group shadow-sm"
+              className="flex items-center justify-center gap-2 py-3 min-h-[44px] text-sm font-medium text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-panel) border border-(--border-subtle) rounded-lg transition-all active:scale-95 group shadow-sm"
               title="New Notebook"
             >
-              <BookPlus className="w-3.5 h-3.5 group-hover:text-(--accent-primary) transition-colors" />
+              <BookPlus className="w-4 h-4 group-hover:text-(--accent-primary) transition-colors" />
               <span>Notebook</span>
             </button>
           </div>
           <button 
             onClick={() => setShowSettings(true)}
-            className="flex items-center gap-3 w-full px-3 py-2 text-sm text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-panel) rounded-lg transition-all group"
+            className="flex items-center gap-3 w-full px-3 py-3 min-h-[44px] text-sm text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-panel) rounded-lg transition-all group"
           >
-            <Settings className="w-4 h-4 group-hover:text-(--accent-primary) transition-colors" />
+            <Settings className="w-5 h-5 group-hover:text-(--accent-primary) transition-colors" />
             <span>Settings</span>
           </button>
           <button 
             onClick={() => handleNewPage()}
-            className="flex items-center gap-3 w-full px-3 py-2 text-sm text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-panel) rounded-lg transition-all group"
+            className="flex items-center gap-3 w-full px-3 py-3 min-h-[44px] text-sm text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-panel) rounded-lg transition-all group"
           >
-            <Plus className="w-4 h-4 group-hover:text-(--accent-primary) transition-colors" />
+            <Plus className="w-5 h-5 group-hover:text-(--accent-primary) transition-colors" />
             <span>New Page</span>
           </button>
         </div>
@@ -264,7 +264,7 @@ function FolderItem({ folder, notebooks, pages, activePageId, onPageSelect, onDe
       <div className="flex items-center group/folder">
         <button 
           onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center flex-1 px-2 py-1.5 text-sm rounded-md hover:bg-(--bg-panel) text-(--text-secondary) hover:text-(--text-primary) transition-colors group"
+          className="flex items-center flex-1 px-3 py-3 min-h-[44px] text-sm md:text-base rounded-md hover:bg-(--bg-panel) text-(--text-secondary) hover:text-(--text-primary) transition-colors group"
         >
           <span className="mr-1 opacity-50 group-hover:opacity-100 transition-opacity text-(--text-tertiary)">
             {isOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
@@ -275,24 +275,24 @@ function FolderItem({ folder, notebooks, pages, activePageId, onPageSelect, onDe
         <div className="flex items-center opacity-0 group-hover/folder:opacity-100 transition-opacity">
             <button
             onClick={() => onRenameFolder(folder.id, folder.name)}
-            className="p-1.5 text-zinc-500 hover:text-zinc-200 transition-all"
+            className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center text-zinc-500 hover:text-zinc-200 transition-all"
             title="Rename Folder"
             >
-            <Edit2 className="w-3.5 h-3.5" />
+            <Edit2 className="w-4 h-4" />
             </button>
             <button
             onClick={() => onAddNotebook(folder.id)}
-            className="p-1.5 text-zinc-500 hover:text-zinc-200 transition-all"
+            className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center text-zinc-500 hover:text-zinc-200 transition-all"
             title="New Notebook in Folder"
             >
-            <BookPlus className="w-3.5 h-3.5" />
+            <BookPlus className="w-4 h-4" />
             </button>
             <button
             onClick={() => onDeleteFolder(folder.id)}
-            className="p-1.5 text-zinc-500 hover:text-rose-400 transition-all"
+            className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center text-zinc-500 hover:text-rose-400 transition-all"
             title="Delete Folder"
             >
-            <Trash2 className="w-3.5 h-3.5" />
+            <Trash2 className="w-4 h-4" />
             </button>
         </div>
       </div>
@@ -356,7 +356,7 @@ function NotebookItem({ notebook, pages, activePageId, onPageSelect, onDeletePag
       <div className="flex items-center group/notebook">
         <button 
           onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center flex-1 px-2 py-1.5 text-sm rounded-md hover:bg-(--bg-panel) text-(--text-secondary) hover:text-(--text-primary) transition-colors group"
+          className="flex items-center flex-1 px-3 py-3 min-h-[44px] text-sm md:text-base rounded-md hover:bg-(--bg-panel) text-(--text-secondary) hover:text-(--text-primary) transition-colors group"
         >
           <span className="mr-1 opacity-50 group-hover:opacity-100 transition-opacity text-(--text-tertiary)">
             {isOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
@@ -367,24 +367,24 @@ function NotebookItem({ notebook, pages, activePageId, onPageSelect, onDeletePag
         <div className="flex items-center opacity-0 group-hover/notebook:opacity-100 transition-opacity">
             <button
             onClick={() => onRenameNotebook(notebook.id, notebook.name)}
-            className="p-1.5 text-zinc-500 hover:text-zinc-200 transition-all"
+            className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center text-zinc-500 hover:text-zinc-200 transition-all"
             title="Rename Notebook"
             >
-            <Edit2 className="w-3.5 h-3.5" />
+            <Edit2 className="w-4 h-4" />
             </button>
             <button
             onClick={() => onAddPage(notebook.id)}
-            className="p-1.5 text-zinc-500 hover:text-zinc-200 transition-all"
+            className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center text-zinc-500 hover:text-zinc-200 transition-all"
             title="New Page in Notebook"
             >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-4 h-4" />
             </button>
             <button
             onClick={() => onDeleteNotebook(notebook.id)}
-            className="p-1.5 text-zinc-500 hover:text-rose-400 transition-all"
+            className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center text-zinc-500 hover:text-rose-400 transition-all"
             title="Delete Notebook"
             >
-            <Trash2 className="w-3.5 h-3.5" />
+            <Trash2 className="w-4 h-4" />
             </button>
         </div>
       </div>
@@ -436,7 +436,7 @@ function PageItem({ page, isActive, onSelect, onDelete, onRename }: {
     <div
       onClick={onSelect}
       className={cn(
-        "flex items-center w-full px-2 py-1.5 rounded-md transition-all group relative cursor-pointer select-none",
+        "flex items-center w-full px-3 py-3 min-h-[44px] rounded-md transition-all group relative cursor-pointer select-none",
         isActive 
           ? "bg-(--accent-subtle)/50 text-(--accent-hover) font-medium" 
           : "text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-panel)"
@@ -461,20 +461,20 @@ function PageItem({ page, isActive, onSelect, onDelete, onRename }: {
             e.stopPropagation();
             onRename();
           }}
-          className="p-1 text-zinc-500 hover:text-zinc-200 transition-all"
+          className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center text-zinc-500 hover:text-zinc-200 transition-all"
           title="Rename Page"
         >
-          <Edit2 className="w-3 h-3" />
+          <Edit2 className="w-4 h-4" />
         </button>
         <button
           onClick={(e) => {
             e.stopPropagation();
             onDelete();
           }}
-          className="p-1 text-zinc-500 hover:text-rose-400 transition-all"
+          className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center text-zinc-500 hover:text-rose-400 transition-all"
           title="Delete Page"
         >
-          <Trash2 className="w-3 h-3" />
+          <Trash2 className="w-4 h-4" />
         </button>
       </div>
     </div>

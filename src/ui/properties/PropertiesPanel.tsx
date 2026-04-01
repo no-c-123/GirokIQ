@@ -66,7 +66,7 @@ export function PropertiesPanel() {
           <button
             onClick={() => setShowColorPicker(!showColorPicker)}
             className={cn(
-              "w-6 h-6 rounded-md border border-(--border-subtle) transition-all flex items-center justify-center text-xs text-(--text-tertiary) hover:bg-(--bg-canvas)",
+              "w-10 h-10 md:w-8 md:h-8 rounded-md border border-(--border-subtle) transition-all flex items-center justify-center text-sm md:text-xs text-(--text-tertiary) hover:bg-(--bg-canvas)",
               showColorPicker && "bg-(--accent-subtle)/20 text-(--accent-primary) border-(--accent-primary)/30"
             )}
             title="More colors"
@@ -101,7 +101,7 @@ export function PropertiesPanel() {
               key={w}
               onClick={() => setStrokeWidth(w)}
               className={cn(
-                "flex-1 h-8 rounded-md border border-(--border-subtle) flex items-center justify-center hover:bg-(--bg-canvas) transition-colors",
+                "flex-1 h-11 md:h-10 rounded-md border border-(--border-subtle) flex items-center justify-center hover:bg-(--bg-canvas) transition-colors",
                 strokeWidth === w && "bg-(--accent-subtle)/20 border-(--accent-primary)/30"
               )}
               title={`${w}px`}
@@ -131,7 +131,7 @@ export function PropertiesPanel() {
            <button 
              onClick={() => setStrokeStyle("solid")}
              className={cn(
-                "flex-1 h-8 rounded-md border border-(--border-subtle) flex items-center justify-center hover:bg-(--bg-canvas) transition-colors",
+                "flex-1 h-11 md:h-10 rounded-md border border-(--border-subtle) flex items-center justify-center hover:bg-(--bg-canvas) transition-colors",
                 strokeStyle === "solid" && "bg-(--accent-subtle)/20 border-(--accent-primary)/30"
              )}
             >
@@ -140,7 +140,7 @@ export function PropertiesPanel() {
            <button 
              onClick={() => setStrokeStyle("dashed")}
              className={cn(
-                "flex-1 h-8 rounded-md border border-(--border-subtle) flex items-center justify-center hover:bg-(--bg-canvas) transition-colors",
+                "flex-1 h-11 md:h-10 rounded-md border border-(--border-subtle) flex items-center justify-center hover:bg-(--bg-canvas) transition-colors",
                 strokeStyle === "dashed" && "bg-(--accent-subtle)/20 border-(--accent-primary)/30"
              )}
             >
@@ -149,7 +149,7 @@ export function PropertiesPanel() {
            <button 
              onClick={() => setStrokeStyle("dotted")}
              className={cn(
-                "flex-1 h-8 rounded-md border border-(--border-subtle) flex items-center justify-center hover:bg-(--bg-canvas) transition-colors",
+                "flex-1 h-11 md:h-10 rounded-md border border-(--border-subtle) flex items-center justify-center hover:bg-(--bg-canvas) transition-colors",
                 strokeStyle === "dotted" && "bg-(--accent-subtle)/20 border-(--accent-primary)/30"
              )}
             >
@@ -188,7 +188,7 @@ function ColorButton({
     <button
       onClick={onClick}
       className={cn(
-        "w-6 h-6 rounded-md border transition-all",
+        "w-10 h-10 md:w-8 md:h-8 rounded-md border transition-all",
         active 
           ? "border-(--accent-primary) shadow-[0_0_0_2px_var(--accent-subtle)]" 
           : "border-(--border-subtle) hover:border-(--text-tertiary)"
